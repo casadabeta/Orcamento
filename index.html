@@ -254,7 +254,16 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
     <!-- BLOCO 1: Saúde financeira do mês — 6 KPIs clicáveis -->
     <div class="mg" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px" id="d-kpis"></div>
 
-    <!-- BLOCO 2: Receita vs Despesa + Distribuição + Histórico -->
+    <!-- BLOCO 2: Fluxo de Caixa em destaque (largura total) -->
+    <div class="card" style="margin-bottom:14px;border-left:4px solid var(--bl)">
+      <div class="ch" style="background:var(--blb)">
+        <span class="ct" style="color:var(--bl)">📅 Fluxo de Caixa — fixos + parcelas por quinzena</span>
+        <span style="font-size:11px;color:var(--bl);cursor:pointer" onclick="navTo('lancamentos')">ver detalhes →</span>
+      </div>
+      <div id="d-fluxo-dash"></div>
+    </div>
+
+    <!-- BLOCO 3: Receita vs Despesa + Distribuição + Histórico -->
     <div style="display:grid;grid-template-columns:340px 1fr;gap:14px;margin-bottom:14px;align-items:start">
       <!-- Coluna esq: extrato do mês -->
       <div>
@@ -282,7 +291,7 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
       </div>
     </div>
 
-    <!-- BLOCO 3: Gastos — por pessoa e por categoria lado a lado -->
+    <!-- BLOCO 4: Gastos — por pessoa e por categoria lado a lado -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
       <div class="card">
         <div class="ch"><span class="ct">👥 Por pessoa</span><span style="font-size:10px;color:var(--tx3)">clique para detalhar</span></div>
@@ -298,7 +307,7 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
       </div>
     </div>
 
-    <!-- BLOCO 4: Compromissos futuros — Parcelas + Dívidas + Metas -->
+    <!-- BLOCO 5: Compromissos futuros — Parcelas + Dívidas + Metas -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
       <div class="card">
         <div class="ch" style="background:var(--blb)">
@@ -330,7 +339,7 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
       </div>
     </div>
 
-    <!-- BLOCO 5: Projeção + Insights lado a lado -->
+    <!-- BLOCO 6: Projeção + Insights lado a lado -->
     <div style="display:grid;grid-template-columns:1fr 340px;gap:14px;margin-bottom:14px;align-items:start">
       <div class="card">
         <div class="ch">
@@ -348,14 +357,6 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
         <div class="card" style="margin-bottom:12px">
           <div class="ch"><span class="ct">💡 Insights automáticos</span></div>
           <div id="d-insights" style="padding:10px 14px;display:flex;flex-direction:column;gap:7px"></div>
-        </div>
-        <!-- Fluxo de caixa mini -->
-        <div class="card" style="margin-bottom:12px">
-          <div class="ch" style="background:var(--blb)">
-            <span class="ct" style="color:var(--bl)">📅 Fluxo de caixa</span>
-            <span style="font-size:10px;color:var(--bl);cursor:pointer" onclick="navTo('lancamentos')">ver detalhes →</span>
-          </div>
-          <div id="d-fluxo-mini"></div>
         </div>
         <!-- Apartamento novo mini resumo -->
         <div class="card">
@@ -839,6 +840,32 @@ function parcNumNoMes(p, m, a){
 }
 
 function parcMensal(){const{parc}=gparc();return parc.reduce((s,p)=>{if(parcNumNoMes(p,CM,CA)!==null)s+=parseFloat(p.vtotal/(p.n||1))||0;return s},0)}
+
+// Retorna dia de vencimento da parcela (do campo venc ou extrai de data1)
+function parcVencDia(p){
+  if(p.venc&&parseInt(p.venc)>0)return parseInt(p.venc);
+  if(p.data1){const d=new Date(p.data1+'T00:00:00');return d.getDate();}
+  return null;
+}
+
+// Parcelas ativas neste mês agrupadas por quinzena
+function parcPorQuinzena(){
+  const{parc}=gparc();
+  const ativas=parc.filter(p=>parcNumNoMes(p,CM,CA)!==null);
+  const q1=[],q2=[],sem=[];
+  ativas.forEach(p=>{
+    const dia=parcVencDia(p);
+    const vm=parseFloat(p.vtotal/(p.n||1))||0;
+    const item={desc:p.desc||'Parcela',vm,dia,parcNo:parcNumNoMes(p,CM,CA),total:p.n||1};
+    if(!dia)sem.push(item);
+    else if(dia<=15)q1.push(item);
+    else q2.push(item);
+  });
+  return{q1,q2,sem,
+    totQ1:q1.reduce((s,i)=>s+i.vm,0),
+    totQ2:q2.reduce((s,i)=>s+i.vm,0),
+    totSem:sem.reduce((s,i)=>s+i.vm,0)};
+}
 function toast(msg,err){const e=document.getElementById('toast');e.textContent=msg;e.style.background=err?'var(--rd)':'var(--tx)';e.classList.add('on');setTimeout(()=>e.classList.remove('on'),3000)}
 function fillRespSelect(id,cur,all){const sel=document.getElementById(id);if(!sel)return;sel.innerHTML=(all?'<option value="">Todos</option>':'')+MEMBROS.map(m=>'<option value="'+m.id+'"'+(m.id===cur?' selected':'')+'>'+m.label+'</option>').join('')}
 function fillCatSelect(id,cur,all){const sel=document.getElementById(id);if(!sel)return;const{cats}=gcats();sel.innerHTML=(all?'<option value="">Todas</option>':'')+cats.map(c=>'<option value="'+c.id+'"'+(c.id===cur?' selected':'')+'>'+c.emoji+' '+c.nome+'</option>').join('')}
@@ -1025,45 +1052,42 @@ function aplicarFixosParaMesesSeguintes(){
     fixosAtivos.map(l=>'• '+(l.d||'sem nome')+' — '+fmt(l.v||0)+(l.venc?' (dia '+l.venc+')':'')).join('\n'),
     '12'
   );
-  if(resp===null)return; // cancelou
+  if(resp===null)return;
   const mesesAFrente=parseInt(resp)||0;
   if(mesesAFrente<=0){toast('Informe um número maior que zero.',1);return;}
 
-  // Captura snapshot dos fixos ANTES de qualquer escrita
+  // Snapshot antes de qualquer escrita
   const snapshot=fixosAtivos.map(f=>({...f}));
 
   let aplicados=0;
   for(let i=1;i<=mesesAFrente;i++){
-    // Calcula mês/ano corretamente para qualquer quantidade
+    // mk() usa o número do mês diretamente (CM=5 → "05" = Junho)
+    // então m2 deve ser calculado da mesma forma que CM
     const totalMes=CM+i;
-    const m2=((totalMes%12)+12)%12;
+    const m2=((totalMes%12)+12)%12;         // 0–11, igual ao CM
     const a2=CA+Math.floor(totalMes/12);
-    const mesKey=a2+'-'+String(m2+1).padStart(2,'0');
+    const k2=mk(m2,a2);                      // chave correta: mk(6,2026)="2026-06"
+    const mesKey=a2+'-'+String(m2).padStart(2,'0'); // igual ao k2 para comparação
 
-    // Lê storage fresco a cada iteração para não sobrescrever iterações anteriores
     const store=ld();
     if(!store.mes)store.mes={};
-    const k2=mk(m2,a2);
     if(!store.mes[k2])store.mes[k2]={ls:10000,lc:0,ldt:'',as:3500,ac:0,adt:'',or:[],lanc:[],plan:{}};
     const mes2=store.mes[k2];
     if(!mes2.lanc)mes2.lanc=[];
 
     snapshot.forEach(f=>{
-      // Não copia se encerrado antes deste mês
       if(f.recorrencia==='data_fim'&&f.fim_mes&&f.fim_mes<mesKey)return;
       const existe=mes2.lanc.findIndex(l=>l.tipo==='fixo'&&l.d===f.d);
       if(existe>=0){
-        // Atualiza valor, vencimento e recorrência do existente
-        mes2.lanc[existe]={...mes2.lanc[existe], v:f.v, venc:f.venc,
-          recorrencia:f.recorrencia, fim_mes:f.fim_mes};
+        mes2.lanc[existe]={...mes2.lanc[existe],v:f.v,venc:f.venc,
+          recorrencia:f.recorrencia,fim_mes:f.fim_mes};
       } else {
         mes2.lanc.push({...f});
       }
     });
 
-    // Salva direto no store sem passar por gmes() para evitar conflito de closure
     store.mes[k2]=mes2;
-    localStorage.setItem(SK, JSON.stringify(store));
+    localStorage.setItem(SK,JSON.stringify(store));
     aplicados++;
   }
   toast('✅ Fixos aplicados em '+aplicados+' meses!');
@@ -1073,91 +1097,100 @@ function aplicarFixosParaMesesSeguintes(){
 // ── FLUXO DE CAIXA ────────────────────────────────────────────────────────
 function buildFluxoCaixa(){
   const{m:mes}=gmes();
-  const mesAtual=CA+'-'+String(CM+1).padStart(2,'0');
+  const mesAtual=CA+'-'+String(CM).padStart(2,'0');
   const fixos=(mes.lanc||[]).filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual)&&l.v>0);
 
-  const q1=fixos.filter(l=>l.venc&&l.venc<=15);   // até dia 15
-  const q2=fixos.filter(l=>l.venc&&l.venc>15);     // dia 16–31
-  const sem=fixos.filter(l=>!l.venc);              // sem vencimento
+  // Fixos por quinzena
+  const fq1=fixos.filter(l=>l.venc&&l.venc<=15);
+  const fq2=fixos.filter(l=>l.venc&&l.venc>15);
+  const fsem=fixos.filter(l=>!l.venc);
 
-  const totQ1=q1.reduce((s,l)=>s+(l.v||0),0);
-  const totQ2=q2.reduce((s,l)=>s+(l.v||0),0);
-  const totSem=sem.reduce((s,l)=>s+(l.v||0),0);
-  const totGeral=totQ1+totQ2+totSem;
+  // Parcelas por quinzena
+  const pp=parcPorQuinzena();
+
+  // Totais combinados
+  const totQ1=(fq1.reduce((s,l)=>s+(l.v||0),0))+(pp.totQ1);
+  const totQ2=(fq2.reduce((s,l)=>s+(l.v||0),0))+(pp.totQ2);
+  const totSemV=(fsem.reduce((s,l)=>s+(l.v||0),0))+(pp.totSem);
+  const totGeral=totQ1+totQ2+totSemV;
+  const pctQ1=totGeral>0?Math.round(totQ1/totGeral*100):0;
+  const pctQ2=totGeral>0?Math.round(totQ2/totGeral*100):0;
+  const pctSem=totGeral>0?Math.round(totSemV/totGeral*100):0;
 
   const el=document.getElementById('lanc-fluxo');
   if(!el)return;
 
-  if(!fixos.length){
-    el.innerHTML='<div style="padding:14px 16px;color:var(--tx3);font-size:13px">Nenhum gasto fixo com valor. Adicione gastos fixos e defina os dias de vencimento.</div>';
+  if(!fixos.length&&!pp.q1.length&&!pp.q2.length&&!pp.sem.length){
+    el.innerHTML='<div style="padding:14px 16px;color:var(--tx3);font-size:13px">Adicione gastos fixos e defina os dias de vencimento para ver o fluxo.</div>';
     return;
   }
 
-  // Barra visual de concentração
-  const pctQ1=totGeral>0?Math.round(totQ1/totGeral*100):0;
-  const pctQ2=totGeral>0?Math.round(totQ2/totGeral*100):0;
-  const pctSem=totGeral>0?Math.round(totSem/totGeral*100):0;
-
   el.innerHTML='';
 
-  // Grid de 3 cards: Q1, Q2, Sem vencimento
+  // ── Três colunas: Q1, Q2, Sem vencimento ─────────────────────────────
   const grid=document.createElement('div');
   grid.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bor)';
 
-  function mkQuinCard(titulo,cor,tot,pct,itens,subtitulo){
-    const d=document.createElement('div');
-    d.style.cssText='background:var(--sur);padding:14px 16px';
-    d.innerHTML=
-      '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:4px">'+titulo+'</div>'+
-      '<div style="font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;color:'+cor+'">'+fmt(tot)+'</div>'+
-      '<div style="font-size:11px;color:var(--tx3);margin-bottom:8px">'+pct+'% do total fixo · '+itens.length+' conta(s)</div>'+
+  function mkCard(titulo,corHex,tot,pct,fixItems,parcItems,subtitulo){
+    const d=document.createElement('div');d.style.cssText='background:var(--sur);padding:14px 16px';
+    d.innerHTML='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:4px">'+titulo+'</div>'+
+      '<div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:'+corHex+'">'+fmt(tot)+'</div>'+
+      '<div style="font-size:11px;color:var(--tx3);margin-bottom:8px">'+pct+'% do total · '+(fixItems.length+parcItems.length)+' item(s)</div>'+
       '<div style="font-size:10px;color:var(--tx2)">'+subtitulo+'</div>';
-    // Lista de itens
-    if(itens.length){
-      const ul=document.createElement('div');ul.style.cssText='margin-top:8px;border-top:1px solid var(--bor);padding-top:6px';
-      itens.sort((a,b)=>(a.venc||99)-(b.venc||99)).forEach(l=>{
-        const li=document.createElement('div');
-        li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;border-bottom:1px solid var(--bor)';
-        li.innerHTML='<span style="color:var(--tx2)">'+
-          (l.venc?'<span style="background:var(--blb);color:var(--bl);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">'+l.venc+'</span>':'<span style="background:var(--sur2);color:var(--tx3);border-radius:4px;padding:1px 5px;font-size:10px;margin-right:4px">—</span>')+
+
+    if(fixItems.length||parcItems.length){
+      const ul=document.createElement('div');
+      ul.style.cssText='margin-top:8px;border-top:1px solid var(--bor);padding-top:6px;display:flex;flex-direction:column;gap:2px';
+
+      // Fixos
+      [...fixItems].sort((a,b)=>(a.venc||99)-(b.venc||99)).forEach(l=>{
+        const li=document.createElement('div');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;border-bottom:1px solid var(--bor)';
+        li.innerHTML='<span>'+
+          (l.venc?'<span style="background:var(--blb);color:var(--bl);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>':'')+
           esc(l.d||catN(l.c))+'</span>'+
           '<span style="font-weight:600;color:var(--rd);font-variant-numeric:tabular-nums">'+fmt(l.v)+'</span>';
         ul.appendChild(li);
       });
+
+      // Parcelas
+      [...parcItems].sort((a,b)=>(a.dia||99)-(b.dia||99)).forEach(p=>{
+        const li=document.createElement('div');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;border-bottom:1px solid var(--bor)';
+        li.innerHTML='<span>'+
+          (p.dia?'<span style="background:var(--amb);color:var(--am);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+p.dia+'</span>':'')+
+          '<span style="font-size:10px;color:var(--bl);margin-right:3px">💳</span>'+esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span></span>'+
+          '<span style="font-weight:600;color:var(--rd);font-variant-numeric:tabular-nums">'+fmt(p.vm)+'</span>';
+        ul.appendChild(li);
+      });
+
       d.appendChild(ul);
     }
     return d;
   }
 
-  grid.appendChild(mkQuinCard(
-    '🔵 1ª Quinzena (dias 1–15)','var(--bl)',totQ1,pctQ1,q1,
-    q1.length?'Vence entre os dias 1 e 15':'Nenhuma conta nesta quinzena'
-  ));
-  grid.appendChild(mkQuinCard(
-    '🟡 2ª Quinzena (dias 16–31)','var(--am)',totQ2,pctQ2,q2,
-    q2.length?'Vence entre os dias 16 e 31':'Nenhuma conta nesta quinzena'
-  ));
-  grid.appendChild(mkQuinCard(
-    '⚪ Sem vencimento definido','var(--tx3)',totSem,pctSem,sem,
-    sem.length?'Defina o dia de vencimento na coluna "Venc."':'Todas as contas têm vencimento ✅'
-  ));
+  grid.appendChild(mkCard('🔵 1ª Quinzena — dias 1 a 15','var(--bl)',totQ1,pctQ1,fq1,pp.q1,
+    fq1.length+pp.q1.length>0?'Vence até dia 15':'Nenhum item nesta quinzena'));
+  grid.appendChild(mkCard('🟡 2ª Quinzena — dias 16 a 31','var(--am)',totQ2,pctQ2,fq2,pp.q2,
+    fq2.length+pp.q2.length>0?'Vence entre os dias 16 e 31':'Nenhum item nesta quinzena'));
+  grid.appendChild(mkCard('⚪ Sem vencimento','var(--tx3)',totSemV,pctSem,fsem,pp.sem,
+    totSemV>0?'Defina o dia de vencimento':'✅ Tudo com vencimento definido'));
   el.appendChild(grid);
 
-  // Barra de distribuição visual
+  // ── Barra de distribuição ──────────────────────────────────────────────
   if(totGeral>0){
     const barWrap=document.createElement('div');
     barWrap.style.cssText='padding:10px 16px 12px;border-top:1px solid var(--bor)';
     barWrap.innerHTML=
-      '<div style="font-size:10px;color:var(--tx3);margin-bottom:6px;font-weight:600">Distribuição do total fixo ('+fmt(totGeral)+')</div>'+
+      '<div style="font-size:10px;color:var(--tx3);margin-bottom:6px;font-weight:600">Total comprometido em '+MF[CM]+'/'+CA+': '+fmt(totGeral)+'</div>'+
       '<div style="height:12px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:6px">'+
-        '<div style="flex:'+totQ1+';background:var(--bl);min-width:'+(pctQ1>0?'2px':'0')+'"></div>'+
-        '<div style="flex:'+totQ2+';background:var(--am);min-width:'+(pctQ2>0?'2px':'0')+'"></div>'+
-        '<div style="flex:'+totSem+';background:var(--bor2);min-width:'+(pctSem>0?'2px':'0')+'"></div>'+
+        '<div style="flex:'+Math.max(totQ1,0.01)+';background:var(--bl)"></div>'+
+        '<div style="flex:'+Math.max(totQ2,0.01)+';background:var(--am)"></div>'+
+        (totSemV>0?'<div style="flex:'+totSemV+';background:var(--bor2)"></div>':'')+
       '</div>'+
-      '<div style="display:flex;gap:14px;font-size:11px;color:var(--tx2)">'+
-        '<span><span style="display:inline-block;width:10px;height:10px;background:var(--bl);border-radius:2px;margin-right:4px;vertical-align:middle"></span>1ª Quinzena '+pctQ1+'%</span>'+
-        '<span><span style="display:inline-block;width:10px;height:10px;background:var(--am);border-radius:2px;margin-right:4px;vertical-align:middle"></span>2ª Quinzena '+pctQ2+'%</span>'+
-        (totSem>0?'<span><span style="display:inline-block;width:10px;height:10px;background:var(--bor2);border-radius:2px;margin-right:4px;vertical-align:middle"></span>Sem venc. '+pctSem+'%</span>':'')+'</div>';
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--tx2)">'+
+        '<span><span style="display:inline-block;width:10px;height:10px;background:var(--bl);border-radius:2px;margin-right:4px;vertical-align:middle"></span>1ª Quinzena '+fmt(totQ1)+' ('+pctQ1+'%)</span>'+
+        '<span><span style="display:inline-block;width:10px;height:10px;background:var(--am);border-radius:2px;margin-right:4px;vertical-align:middle"></span>2ª Quinzena '+fmt(totQ2)+' ('+pctQ2+'%)</span>'+
+        (totSemV>0?'<span><span style="display:inline-block;width:10px;height:10px;background:var(--bor2);border-radius:2px;margin-right:4px;vertical-align:middle"></span>Sem venc. '+fmt(totSemV)+'</span>':'')+
+      '</div>';
     el.appendChild(barWrap);
   }
 }
@@ -1202,7 +1235,7 @@ function propagaFixos(targetM, targetA){
     }
   }
   if(!fixosBase.length)return;
-  const mesAtual=targetA+'-'+String(targetM+1).padStart(2,'0');
+  const mesAtual=targetA+'-'+String(targetM).padStart(2,'0'); // mk() uses m directly, no +1
   // Copia apenas recorrentes que ainda não encerraram
   fixosBase.forEach(f=>{
     if(f.recorrencia==='data_fim'&&f.fim_mes&&f.fim_mes<mesAtual)return;
@@ -1244,7 +1277,7 @@ function excluiFixoFuturos(lanc){
   Object.keys(store.mes||{}).forEach(k=>{
     const[ay,am]=k.split('-').map(Number);
     // Meses futuros E atual
-    if(ay>CA||(ay===CA&&am-1>=CM)){
+    if(ay>CA||(ay===CA&&am>=CM)){
       const mes=store.mes[k];
       const antes=(mes.lanc||[]).length;
       mes.lanc=(mes.lanc||[]).filter(l=>!(l.tipo==='fixo'&&l.d===lanc.d));
@@ -2582,46 +2615,57 @@ function rDash(){
 
   renderChartHist();
 
-  // ── Fluxo de caixa mini ───────────────────────────────────────────────
-  const fluxoEl=document.getElementById('d-fluxo-mini');
-  if(fluxoEl){
+  // ── Fluxo de caixa no dashboard (posição de destaque) ────────────────
+  const fluxoDashEl=document.getElementById('d-fluxo-dash');
+  if(fluxoDashEl){
     const{m:mes2}=gmes();
-    const mesAtual2=CA+'-'+String(CM+1).padStart(2,'0');
+    const mesAtual2=CA+'-'+String(CM).padStart(2,'0');
     const fixos2=(mes2.lanc||[]).filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual2)&&l.v>0);
-    const q1=fixos2.filter(l=>l.venc&&l.venc<=15);
-    const q2=fixos2.filter(l=>l.venc&&l.venc>15);
-    const sem=fixos2.filter(l=>!l.venc);
-    const totQ1=q1.reduce((s,l)=>s+(l.v||0),0);
-    const totQ2=q2.reduce((s,l)=>s+(l.v||0),0);
-    const totSem=sem.reduce((s,l)=>s+(l.v||0),0);
-    const totG=totQ1+totQ2+totSem;
-    if(!fixos2.length){
-      fluxoEl.innerHTML='<div style="padding:12px 16px;color:var(--tx3);font-size:12px">Defina vencimentos nos gastos fixos.</div>';
+    const pp2=parcPorQuinzena();
+    const fq1=fixos2.filter(l=>l.venc&&l.venc<=15);
+    const fq2=fixos2.filter(l=>l.venc&&l.venc>15);
+    const fsem=fixos2.filter(l=>!l.venc);
+    const tQ1=(fq1.reduce((s,l)=>s+(l.v||0),0))+pp2.totQ1;
+    const tQ2=(fq2.reduce((s,l)=>s+(l.v||0),0))+pp2.totQ2;
+    const tSem=(fsem.reduce((s,l)=>s+(l.v||0),0))+pp2.totSem;
+    const tG=tQ1+tQ2+tSem;
+    const p1=tG>0?Math.round(tQ1/tG*100):0;
+    const p2=tG>0?Math.round(tQ2/tG*100):0;
+
+    if(!fixos2.length&&!pp2.q1.length&&!pp2.q2.length){
+      fluxoDashEl.innerHTML='<div style="padding:14px 16px;color:var(--tx3);font-size:13px">Lance gastos fixos e defina os dias de vencimento para ver o fluxo.</div>';
     } else {
-      fluxoEl.innerHTML=
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bor)">'+
-        '<div style="background:var(--sur);padding:10px 14px">'+
-          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:3px">🔵 1ª quinzena (1–15)</div>'+
-          '<div style="font-size:16px;font-weight:700;color:var(--bl);font-variant-numeric:tabular-nums">'+fmt(totQ1)+'</div>'+
-          '<div style="font-size:10px;color:var(--tx3)">'+q1.length+' conta(s) · '+(totG>0?Math.round(totQ1/totG*100):0)+'% do fixo</div>'+
+      fluxoDashEl.innerHTML=
+        '<div style="display:grid;grid-template-columns:1fr 1fr '+(tSem>0?'1fr':'')+';gap:1px;background:var(--bor)">'+
+        // Q1
+        '<div style="background:var(--sur);padding:14px 18px">'+
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:5px">🔵 1ª Quinzena — dias 1 a 15</div>'+
+          '<div style="font-size:26px;font-weight:700;color:var(--bl);font-variant-numeric:tabular-nums;margin-bottom:4px">'+fmt(tQ1)+'</div>'+
+          '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">'+(fq1.length+pp2.q1.length)+' item(s) · '+p1+'% do total</div>'+
+          '<div style="display:flex;flex-direction:column;gap:3px">'+
+          [...fq1].sort((a,b)=>(a.venc||0)-(b.venc||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--blb);color:var(--bl);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>'+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
+          pp2.q1.sort((a,b)=>(a.dia||0)-(b.dia||0)).map(p=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+p.dia+'</span>💳 '+esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span></span><span style="font-weight:700;color:var(--rd)">'+fmt(p.vm)+'</span></div>').join('')+
+          '</div></div>'+
+        // Q2
+        '<div style="background:var(--sur);padding:14px 18px">'+
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:5px">🟡 2ª Quinzena — dias 16 a 31</div>'+
+          '<div style="font-size:26px;font-weight:700;color:var(--am);font-variant-numeric:tabular-nums;margin-bottom:4px">'+fmt(tQ2)+'</div>'+
+          '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">'+(fq2.length+pp2.q2.length)+' item(s) · '+p2+'% do total</div>'+
+          '<div style="display:flex;flex-direction:column;gap:3px">'+
+          [...fq2].sort((a,b)=>(a.venc||0)-(b.venc||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>'+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
+          pp2.q2.sort((a,b)=>(a.dia||0)-(b.dia||0)).map(p=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+p.dia+'</span>💳 '+esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span></span><span style="font-weight:700;color:var(--rd)">'+fmt(p.vm)+'</span></div>').join('')+
+          '</div></div>'+
+        // Sem vencimento (conditional)
+        (tSem>0?'<div style="background:var(--sur2);padding:14px 18px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:5px">⚪ Sem vencimento</div><div style="font-size:22px;font-weight:700;color:var(--tx3);margin-bottom:4px">'+fmt(tSem)+'</div><div style="font-size:11px;color:var(--am)">⚠️ Defina o dia de vencimento</div></div>':'')+
         '</div>'+
-        '<div style="background:var(--sur);padding:10px 14px">'+
-          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:3px">🟡 2ª quinzena (16–31)</div>'+
-          '<div style="font-size:16px;font-weight:700;color:var(--am);font-variant-numeric:tabular-nums">'+fmt(totQ2)+'</div>'+
-          '<div style="font-size:10px;color:var(--tx3)">'+q2.length+' conta(s) · '+(totG>0?Math.round(totQ2/totG*100):0)+'% do fixo</div>'+
-        '</div></div>'+
-        (totSem>0?
-          '<div style="padding:7px 14px;background:var(--sur2);border-top:1px solid var(--bor);font-size:11px;color:var(--am)">'+
-          '⚠️ '+sem.length+' conta(s) sem vencimento definido ('+fmt(totSem)+')</div>':
-          '<div style="padding:7px 14px;background:var(--gnb);border-top:1px solid var(--bor);font-size:11px;color:var(--gn)">'+
-          '✅ Todas as contas têm vencimento definido</div>'
-        )+
-        '<div style="padding:6px 14px 8px;border-top:1px solid var(--bor)">'+
-          '<div style="height:8px;border-radius:4px;overflow:hidden;display:flex">'+
-            '<div style="flex:'+totQ1+';background:var(--bl)"></div>'+
-            '<div style="flex:'+totQ2+';background:var(--am)"></div>'+
-            '<div style="flex:'+totSem+';background:var(--bor2)"></div>'+
+        // Barra total
+        '<div style="padding:10px 16px;border-top:1px solid var(--bor);display:flex;align-items:center;gap:12px">'+
+          '<div style="flex:1;height:10px;border-radius:5px;overflow:hidden;display:flex">'+
+            '<div style="flex:'+Math.max(tQ1,0.01)+';background:var(--bl)"></div>'+
+            '<div style="flex:'+Math.max(tQ2,0.01)+';background:var(--am)"></div>'+
+            (tSem>0?'<div style="flex:'+tSem+';background:var(--bor2)"></div>':'')+
           '</div>'+
+          '<div style="font-size:12px;color:var(--tx2);white-space:nowrap">Total: <strong style="font-variant-numeric:tabular-nums">'+fmt(tG)+'</strong></div>'+
         '</div>';
     }
   }
