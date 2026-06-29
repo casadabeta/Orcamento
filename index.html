@@ -472,8 +472,7 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
     </div>
     <div id="plan-card" style="display:none"><div class="card"><div class="ch"><span class="ct">Meta por categoria</span></div><div id="plan-list"></div></div></div>
 
-    <!-- stubs para compatibilidade -->
-    <div style="display:none"><div id="lanc-list"></div><div id="g-list"></div><div id="g-cats"></div><div id="g-metrics"></div><span id="g-tot"></span><div id="fixas-wrap"></div></div>
+
   </div>
 
     <!-- PARCELAMENTOS -->
@@ -518,13 +517,6 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
     <div id="metas-list"></div>
   </div>
 
-  <!-- PROJEÇÃO -->
-  <div class="sec" id="s-projecao">
-    <div class="ph"><div><div class="pt">Projeção</div><div class="ps">Próximos 6 meses</div></div></div>
-    <div class="al al-bl">Usa salário fixo + média das comissões e variáveis dos últimos meses.</div>
-    <div class="card" style="margin-bottom:14px"><div class="ch"><span class="ct">Receita vs Despesa estimada</span></div><div style="padding:16px;height:220px"><canvas id="ch-proj"></canvas></div></div>
-    <div class="card"><div class="pj-h"><span>Mês</span><span>Receita est.</span><span>Despesa est.</span><span>Saldo est.</span><span>Situação</span></div><div id="proj-tbl"></div></div>
-  </div>
 
   <!-- LINHA DO TEMPO -->
   <div class="sec" id="s-timeline">
@@ -887,7 +879,7 @@ document.getElementById('search-inp').addEventListener('input',function(){
   box.style.display='block';
   box.querySelectorAll('.sr-item[data-idx]').forEach(e=>e.addEventListener('click',()=>{results[+e.dataset.idx].action();box.style.display='none';document.getElementById('search-inp').value=''}));
 });
-document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))document.getElementById('search-results').style.display='none'});
+document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))(document.getElementById('search-results')||{style:{}}).style.display='none'});
 
 // RECEITAS
 let recBound=false;
@@ -1001,9 +993,7 @@ function buildGCats(){
     el2.appendChild(div);
   });
 }
-function filterGastos({c,resp}){const{m:mes}=gmes();return(mes.gs||[]).filter(g=>(!c||g.c===c)&&(!resp||g.resp===resp))}
-let planOpen=false;
-function togglePlan(){planOpen=!planOpen;document.getElementById('plan-card').style.display=planOpen?'block':'none';if(planOpen)buildPlanList()}
+function togglePlan(){planOpen=!planOpen;const _pc=document.getElementById('plan-card');if(_pc)_pc.style.display=planOpen?'block':'none';if(planOpen)buildPlanList()}
 function buildPlanList(){
   const{m:mes}=gmes();const plan=mes.plan||{};const{cats}=gcats();const list=document.getElementById('plan-list');if(!list)return;
   list.innerHTML='';cats.forEach(c=>{const row=document.createElement('div');row.className='row';const lbl=document.createElement('div');lbl.className='rl';lbl.textContent=c.emoji+' '+c.nome;
@@ -1030,34 +1020,50 @@ function aplicarFixosParaMesesSeguintes(){
   const fixosAtivos=(mesAtual.lanc||[]).filter(l=>l.tipo==='fixo');
   if(!fixosAtivos.length){toast('Nenhum gasto fixo para copiar.',1);return;}
 
-  const mesesAFrente=parseInt(prompt(
+  const resp=prompt(
     'Aplicar '+fixosAtivos.length+' gasto(s) fixo(s) de '+MF[CM]+'/'+CA+' para quantos meses à frente?\n\n'+
     fixosAtivos.map(l=>'• '+(l.d||'sem nome')+' — '+fmt(l.v||0)+(l.venc?' (dia '+l.venc+')':'')).join('\n'),
     '12'
-  ));
-  if(!mesesAFrente||mesesAFrente<=0)return;
+  );
+  if(resp===null)return; // cancelou
+  const mesesAFrente=parseInt(resp)||0;
+  if(mesesAFrente<=0){toast('Informe um número maior que zero.',1);return;}
+
+  // Captura snapshot dos fixos ANTES de qualquer escrita
+  const snapshot=fixosAtivos.map(f=>({...f}));
 
   let aplicados=0;
   for(let i=1;i<=mesesAFrente;i++){
-    let m2=CM+i, a2=CA;
-    if(m2>11){m2-=12;a2++;}
-    const{d,k,m:mes}=gmes(m2,a2);
-    if(!mes.lanc)mes.lanc=[];
+    // Calcula mês/ano corretamente para qualquer quantidade
+    const totalMes=CM+i;
+    const m2=((totalMes%12)+12)%12;
+    const a2=CA+Math.floor(totalMes/12);
     const mesKey=a2+'-'+String(m2+1).padStart(2,'0');
 
-    fixosAtivos.forEach(f=>{
-      // Verifica se já existe pelo nome
-      const existe=mes.lanc.findIndex(l=>l.tipo==='fixo'&&l.d===f.d);
+    // Lê storage fresco a cada iteração para não sobrescrever iterações anteriores
+    const store=ld();
+    if(!store.mes)store.mes={};
+    const k2=mk(m2,a2);
+    if(!store.mes[k2])store.mes[k2]={ls:10000,lc:0,ldt:'',as:3500,ac:0,adt:'',or:[],lanc:[],plan:{}};
+    const mes2=store.mes[k2];
+    if(!mes2.lanc)mes2.lanc=[];
+
+    snapshot.forEach(f=>{
+      // Não copia se encerrado antes deste mês
+      if(f.recorrencia==='data_fim'&&f.fim_mes&&f.fim_mes<mesKey)return;
+      const existe=mes2.lanc.findIndex(l=>l.tipo==='fixo'&&l.d===f.d);
       if(existe>=0){
-        // Atualiza valor e vencimento do existente
-        mes.lanc[existe]={...mes.lanc[existe], v:f.v, venc:f.venc, recorrencia:f.recorrencia, fim_mes:f.fim_mes};
+        // Atualiza valor, vencimento e recorrência do existente
+        mes2.lanc[existe]={...mes2.lanc[existe], v:f.v, venc:f.venc,
+          recorrencia:f.recorrencia, fim_mes:f.fim_mes};
       } else {
-        // Não existe — só adiciona se não encerrado
-        if(f.recorrencia==='data_fim'&&f.fim_mes&&f.fim_mes<mesKey)return;
-        mes.lanc.push({...f});
+        mes2.lanc.push({...f});
       }
     });
-    smes(mes,d,k);
+
+    // Salva direto no store sem passar por gmes() para evitar conflito de closure
+    store.mes[k2]=mes2;
+    localStorage.setItem(SK, JSON.stringify(store));
     aplicados++;
   }
   toast('✅ Fixos aplicados em '+aplicados+' meses!');
@@ -2266,7 +2272,7 @@ function rAmortizacao(){
     iData.addEventListener('change',()=>{const{d,amortizacoes:aa}=gAmort();aa[i].data=iData.value;d.amortizacoes=aa;sv(d)});
     iDest.addEventListener('change',()=>{const{d,amortizacoes:aa}=gAmort();aa[i].destino=iDest.value;d.amortizacoes=aa;sv(d);rAmortizacao();rDiv()});
     iDesc.addEventListener('input',()=>{const{d,amortizacoes:aa}=gAmort();aa[i].descricao=iDesc.value;d.amortizacoes=aa;sv(d)});
-    iVal.addEventListener('input',()=>{const{d,amortizacoes:aa}=gAmort();aa[i].valor=parseFloat(iVal.value)||0;d.amortizacoes=aa;sv(d);rAmortizacao();rDiv()});
+    iVal.addEventListener('input',()=>{const{d,amortizacoes:aa}=gAmort();aa[i].valor=parseFloat(iVal.value)||0;d.amortizacoes=aa;sv(d);rDiv()});
     iTipo.addEventListener('change',()=>{const{d,amortizacoes:aa}=gAmort();aa[i].tipo=iTipo.value;d.amortizacoes=aa;sv(d)});
 
     row.append(iData,iDest,iDesc,iVal,iTipo,btn);list.appendChild(row);
@@ -2619,34 +2625,6 @@ function rDash(){
         '</div>';
     }
   }
-}
-
-
-function buildAlerts(rec,desp,saldo,mes,div,met){
-  const el2=document.getElementById('d-alerts');if(!el2)return;const alerts=[];
-  const hoje=new Date();
-  // Saldo negativo
-  if(saldo<0)alerts.push({cls:'al-rd',icon:'🚨',msg:'<strong>Déficit de '+fmt(Math.abs(saldo))+'</strong> este mês. Receitas não cobrem despesas.'});
-  // Alta % comprometida
-  const pctRenda=rec>0?Math.round(desp/rec*100):0;
-  if(pctRenda>90)alerts.push({cls:'al-rd',icon:'⚠️',msg:'<strong>'+pctRenda+'%</strong> da renda comprometida com despesas. Margem muito estreita.'});
-  else if(pctRenda>75)alerts.push({cls:'al-am',icon:'⚠️',msg:'<strong>'+pctRenda+'%</strong> da renda comprometida. Atenção ao orçamento.'});
-  // Comissões pendentes
-  const pendCom=[];
-  if(mes.ldt&&mes.lc>0&&new Date(mes.ldt+'T00:00:00')>hoje)pendCom.push('Comissão de Luiz ('+fmtD(mes.ldt)+')');
-  if(mes.adt&&mes.ac>0&&new Date(mes.adt+'T00:00:00')>hoje)pendCom.push('Comissão de Angela ('+fmtD(mes.adt)+')');
-  if(pendCom.length)alerts.push({cls:'al-bl',icon:'📅',msg:'Receita ainda não recebida: '+pendCom.join(' e ')});
-  // Dívidas alta prioridade
-  const divAlta=div.filter(d=>d.status!=='resolvida'&&d.prioridade==='alta');
-  if(divAlta.length)alerts.push({cls:'al-am',icon:'⏳',msg:divAlta.length+' dívida(s) de <strong>alta prioridade</strong> sem pagamento. Planeje a quitação.'});
-  // Parcelas terminando em breve
-  const{parc}=gparc();
-  parc.forEach(p=>{const rest=(p.n||1)-(p.atual||1)+1;if(rest===1)alerts.push({cls:'al-gn',icon:'🎉',msg:'Parcela de <strong>'+esc(p.desc||'—')+'</strong> termina neste mês! Último pagamento.'});else if(rest<=3&&rest>1)alerts.push({cls:'al-bl',icon:'💳',msg:'Parcela de <strong>'+esc(p.desc||'—')+'</strong> termina em '+rest+' meses.'})});
-  // Metas em risco
-  met.forEach(m=>{if(m.prazo&&m.alvo>0){const dt=new Date(m.prazo+'T00:00:00');const meses=Math.round((dt-hoje)/(30*24*3600*1000));const p=Math.round((m.guardado||0)/m.alvo*100);if(meses<=3&&p<50)alerts.push({cls:'al-am',icon:'🎯',msg:'Meta <strong>'+esc(m.nome)+'</strong>: '+p+'% guardado com '+meses+' mes(es) restante(s).'});}});
-  // Mês sem lançamentos
-  if(!(mes.lanc||mes.gs||[]).length)alerts.push({cls:'al-bl',icon:'📝',msg:'Nenhum gasto variável lançado em '+MF[CM]+'. Acesse <strong>Gastos variáveis</strong> para registrar.'});
-  el2.innerHTML=alerts.length?alerts.map(a=>'<div class="al-item '+a.cls+'"><span class="al-icon">'+a.icon+'</span><span>'+a.msg+'</span></div>').join(''):'<div class="al-item al-gn"><span class="al-icon">✅</span><span>Tudo em ordem em '+MF[CM]+'! Nenhum alerta no momento.</span></div>';
 }
 
 
