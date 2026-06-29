@@ -460,8 +460,8 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
           <button class="btn-p" style="padding:5px 11px;font-size:12px" onclick="addLancTipo('variavel')">+ Variável</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 100px 90px 110px 90px 28px;gap:6px;padding:6px 14px;background:var(--sur2);border-bottom:1px solid var(--bor);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3)">
-        <span>Descrição</span><span>Categoria</span><span>Resp.</span><span>Data</span><span style="text-align:right">Gastos (R$)</span><span></span>
+      <div style="display:grid;grid-template-columns:1fr 100px 90px 110px 60px 90px 28px;gap:6px;padding:6px 14px;background:var(--sur2);border-bottom:1px solid var(--bor);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3)">
+        <span>Descrição</span><span>Categoria</span><span>Resp.</span><span>Data</span><span style="text-align:center">Venc.</span><span style="text-align:right">Gastos (R$)</span><span></span>
       </div>
       <div id="lanc-var-list"></div>
     </div>
@@ -1099,19 +1099,30 @@ function buildFluxoCaixa(){
   const{m:mes}=gmes();
   const mesAtual=CA+'-'+String(CM).padStart(2,'0');
   const fixos=(mes.lanc||[]).filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual)&&l.v>0);
+  const vars=(mes.lanc||[]).filter(l=>l.tipo==='variavel'&&l.v>0);
 
   // Fixos por quinzena
   const fq1=fixos.filter(l=>l.venc&&l.venc<=15);
   const fq2=fixos.filter(l=>l.venc&&l.venc>15);
   const fsem=fixos.filter(l=>!l.venc);
 
+  // Variáveis por quinzena (usa venc ou extrai dia da data)
+  function varDia(l){
+    if(l.venc&&parseInt(l.venc)>0)return parseInt(l.venc);
+    if(l.data){const d=new Date(l.data+'T00:00:00');return isNaN(d)?null:d.getDate();}
+    return null;
+  }
+  const vq1=vars.filter(l=>{const d=varDia(l);return d&&d<=15;});
+  const vq2=vars.filter(l=>{const d=varDia(l);return d&&d>15;});
+  const vsem=vars.filter(l=>!varDia(l));
+
   // Parcelas por quinzena
   const pp=parcPorQuinzena();
 
-  // Totais combinados
-  const totQ1=(fq1.reduce((s,l)=>s+(l.v||0),0))+(pp.totQ1);
-  const totQ2=(fq2.reduce((s,l)=>s+(l.v||0),0))+(pp.totQ2);
-  const totSemV=(fsem.reduce((s,l)=>s+(l.v||0),0))+(pp.totSem);
+  // Totais combinados (fixos + variáveis + parcelas)
+  const totQ1=(fq1.reduce((s,l)=>s+(l.v||0),0))+(vq1.reduce((s,l)=>s+(l.v||0),0))+(pp.totQ1);
+  const totQ2=(fq2.reduce((s,l)=>s+(l.v||0),0))+(vq2.reduce((s,l)=>s+(l.v||0),0))+(pp.totQ2);
+  const totSemV=(fsem.reduce((s,l)=>s+(l.v||0),0))+(vsem.reduce((s,l)=>s+(l.v||0),0))+(pp.totSem);
   const totGeral=totQ1+totQ2+totSemV;
   const pctQ1=totGeral>0?Math.round(totQ1/totGeral*100):0;
   const pctQ2=totGeral>0?Math.round(totQ2/totGeral*100):0;
@@ -1120,7 +1131,7 @@ function buildFluxoCaixa(){
   const el=document.getElementById('lanc-fluxo');
   if(!el)return;
 
-  if(!fixos.length&&!pp.q1.length&&!pp.q2.length&&!pp.sem.length){
+  if(!fixos.length&&!vars.length&&!pp.q1.length&&!pp.q2.length&&!pp.sem.length){
     el.innerHTML='<div style="padding:14px 16px;color:var(--tx3);font-size:13px">Adicione gastos fixos e defina os dias de vencimento para ver o fluxo.</div>';
     return;
   }
@@ -1131,47 +1142,47 @@ function buildFluxoCaixa(){
   const grid=document.createElement('div');
   grid.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bor)';
 
-  function mkCard(titulo,corHex,tot,pct,fixItems,parcItems,subtitulo){
+  function mkCard(titulo,corHex,tot,pct,fixItems,varItems,parcItems,subtitulo){
     const d=document.createElement('div');d.style.cssText='background:var(--sur);padding:14px 16px';
+    const nItems=fixItems.length+varItems.length+parcItems.length;
     d.innerHTML='<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:4px">'+titulo+'</div>'+
       '<div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:'+corHex+'">'+fmt(tot)+'</div>'+
-      '<div style="font-size:11px;color:var(--tx3);margin-bottom:8px">'+pct+'% do total · '+(fixItems.length+parcItems.length)+' item(s)</div>'+
+      '<div style="font-size:11px;color:var(--tx3);margin-bottom:8px">'+pct+'% do total · '+nItems+' item(s)</div>'+
       '<div style="font-size:10px;color:var(--tx2)">'+subtitulo+'</div>';
 
-    if(fixItems.length||parcItems.length){
+    if(nItems>0){
       const ul=document.createElement('div');
       ul.style.cssText='margin-top:8px;border-top:1px solid var(--bor);padding-top:6px;display:flex;flex-direction:column;gap:2px';
 
-      // Fixos
-      [...fixItems].sort((a,b)=>(a.venc||99)-(b.venc||99)).forEach(l=>{
+      function mkLi(dia,label,valor,badge,icon){
         const li=document.createElement('div');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;border-bottom:1px solid var(--bor)';
-        li.innerHTML='<span>'+
-          (l.venc?'<span style="background:var(--blb);color:var(--bl);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>':'')+
-          esc(l.d||catN(l.c))+'</span>'+
-          '<span style="font-weight:600;color:var(--rd);font-variant-numeric:tabular-nums">'+fmt(l.v)+'</span>';
-        ul.appendChild(li);
-      });
+        li.innerHTML='<span>'+(dia?'<span style="background:'+badge+';border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+dia+'</span>':'')+(icon?icon+' ':'')+label+'</span>'+
+          '<span style="font-weight:600;color:var(--rd);font-variant-numeric:tabular-nums">'+fmt(valor)+'</span>';
+        return li;
+      }
+
+      // Fixos
+      [...fixItems].sort((a,b)=>(a.venc||99)-(b.venc||99)).forEach(l=>
+        ul.appendChild(mkLi(l.venc,esc(l.d||catN(l.c)),l.v||0,'var(--blb)','📋')));
+
+      // Variáveis
+      [...varItems].sort((a,b)=>(varDia(a)||99)-(varDia(b)||99)).forEach(l=>
+        ul.appendChild(mkLi(varDia(l),esc(l.d||catN(l.c)),l.v||0,'var(--gnb)','🔄')));
 
       // Parcelas
-      [...parcItems].sort((a,b)=>(a.dia||99)-(b.dia||99)).forEach(p=>{
-        const li=document.createElement('div');li.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;border-bottom:1px solid var(--bor)';
-        li.innerHTML='<span>'+
-          (p.dia?'<span style="background:var(--amb);color:var(--am);border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+p.dia+'</span>':'')+
-          '<span style="font-size:10px;color:var(--bl);margin-right:3px">💳</span>'+esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span></span>'+
-          '<span style="font-weight:600;color:var(--rd);font-variant-numeric:tabular-nums">'+fmt(p.vm)+'</span>';
-        ul.appendChild(li);
-      });
+      [...parcItems].sort((a,b)=>(a.dia||99)-(b.dia||99)).forEach(p=>
+        ul.appendChild(mkLi(p.dia,esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span>',p.vm,'var(--amb)','💳')));
 
       d.appendChild(ul);
     }
     return d;
   }
 
-  grid.appendChild(mkCard('🔵 1ª Quinzena — dias 1 a 15','var(--bl)',totQ1,pctQ1,fq1,pp.q1,
+  grid.appendChild(mkCard('🔵 1ª Quinzena — dias 1 a 15','var(--bl)',totQ1,pctQ1,fq1,vq1,pp.q1,
     fq1.length+pp.q1.length>0?'Vence até dia 15':'Nenhum item nesta quinzena'));
-  grid.appendChild(mkCard('🟡 2ª Quinzena — dias 16 a 31','var(--am)',totQ2,pctQ2,fq2,pp.q2,
+  grid.appendChild(mkCard('🟡 2ª Quinzena — dias 16 a 31','var(--am)',totQ2,pctQ2,fq2,vq2,pp.q2,
     fq2.length+pp.q2.length>0?'Vence entre os dias 16 e 31':'Nenhum item nesta quinzena'));
-  grid.appendChild(mkCard('⚪ Sem vencimento','var(--tx3)',totSemV,pctSem,fsem,pp.sem,
+  grid.appendChild(mkCard('⚪ Sem vencimento','var(--tx3)',totSemV,pctSem,fsem,vsem,pp.sem,
     totSemV>0?'Defina o dia de vencimento':'✅ Tudo com vencimento definido'));
   el.appendChild(grid);
 
@@ -1428,7 +1439,7 @@ function buildLancVarList(){
     variaveis.forEach(l=>{
       const ri=(mes.lanc||[]).indexOf(l);
       const row=document.createElement('div');
-      row.style.cssText='display:grid;grid-template-columns:1fr 100px 90px 110px 90px 28px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bor);align-items:center';
+      row.style.cssText='display:grid;grid-template-columns:1fr 100px 90px 110px 60px 90px 28px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bor);align-items:center';
 
       const iD=el('input','it','text',l.d||'','Descrição');iD.style.fontSize='13px';
       const iC=document.createElement('select');iC.style.cssText='font-size:11px;padding:4px 5px;width:100%';
@@ -1436,6 +1447,16 @@ function buildLancVarList(){
       const iR=document.createElement('select');iR.style.cssText='font-size:11px;padding:4px 3px;width:100%';
       MEMBROS.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.label;if(l.resp===m.id)o.selected=true;iR.appendChild(o)});
       const iData=el('input','id','date',l.data||'');iData.style.cssText='font-size:11px;padding:3px 5px;width:100%';
+      // Vencimento para variáveis
+      const iVencV=document.createElement('select');
+      iVencV.style.cssText='font-size:11px;font-weight:700;text-align:center;padding:3px 2px;width:100%;border:1px solid var(--bor);border-radius:var(--r);background:'+(l.venc&&l.venc<=15?'var(--blb)':l.venc?'var(--amb)':'var(--sur)');
+      const nOpt=document.createElement('option');nOpt.value='';nOpt.textContent='—';iVencV.appendChild(nOpt);
+      for(let dv=1;dv<=31;dv++){const o=document.createElement('option');o.value=String(dv);o.textContent='D'+dv;if(String(l.venc)===String(dv))o.selected=true;iVencV.appendChild(o);}
+      iVencV.addEventListener('change',()=>{
+        const{d,k,m}=gmes();m.lanc[ri].venc=parseInt(iVencV.value)||null;smes(m,d,k);
+        iVencV.style.background=m.lanc[ri].venc&&m.lanc[ri].venc<=15?'var(--blb)':m.lanc[ri].venc?'var(--amb)':'var(--sur)';
+        buildFluxoCaixa();
+      });
       const iV=el('input','','number',l.v||'','0,00');
       iV.style.cssText='width:100%;text-align:right;font-size:13px;font-weight:700;padding:4px;border:1px solid var(--gnbd);background:var(--gnb);border-radius:var(--r);font-variant-numeric:tabular-nums';
       const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancVarList();updateLancSummary()});
@@ -1446,9 +1467,9 @@ function buildLancVarList(){
       iData.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].data=iData.value;smes(m,d,k)});
       iV.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].v=parseFloat(iV.value)||0;smes(m,d,k);
         setText('lanc-var-tot',fmt((m.lanc||[]).filter(l=>l.tipo==='variavel').reduce((s,l)=>s+(l.v||0),0)));
-        updateLancSummary();
+        updateLancSummary();buildFluxoCaixa();
       });
-      row.append(iD,iC,iR,iData,iV,btn);
+      row.append(iD,iC,iR,iData,iVencV,iV,btn);
       list.appendChild(row);
     });
   }
@@ -2621,12 +2642,17 @@ function rDash(){
     const{m:mes2}=gmes();
     const mesAtual2=CA+'-'+String(CM).padStart(2,'0');
     const fixos2=(mes2.lanc||[]).filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual2)&&l.v>0);
+    const vars2=(mes2.lanc||[]).filter(l=>l.tipo==='variavel'&&l.v>0);
     const pp2=parcPorQuinzena();
     const fq1=fixos2.filter(l=>l.venc&&l.venc<=15);
     const fq2=fixos2.filter(l=>l.venc&&l.venc>15);
     const fsem=fixos2.filter(l=>!l.venc);
-    const tQ1=(fq1.reduce((s,l)=>s+(l.v||0),0))+pp2.totQ1;
-    const tQ2=(fq2.reduce((s,l)=>s+(l.v||0),0))+pp2.totQ2;
+    // variáveis — usa venc ou extrai dia da data
+    function vd2(l){if(l.venc&&parseInt(l.venc)>0)return parseInt(l.venc);if(l.data){const d=new Date(l.data+'T00:00:00');return isNaN(d)?null:d.getDate();}return null;}
+    const vq1d=vars2.filter(l=>{const d=vd2(l);return d&&d<=15;});
+    const vq2d=vars2.filter(l=>{const d=vd2(l);return d&&d>15;});
+    const tQ1=(fq1.reduce((s,l)=>s+(l.v||0),0))+(vq1d.reduce((s,l)=>s+(l.v||0),0))+pp2.totQ1;
+    const tQ2=(fq2.reduce((s,l)=>s+(l.v||0),0))+(vq2d.reduce((s,l)=>s+(l.v||0),0))+pp2.totQ2;
     const tSem=(fsem.reduce((s,l)=>s+(l.v||0),0))+pp2.totSem;
     const tG=tQ1+tQ2+tSem;
     const p1=tG>0?Math.round(tQ1/tG*100):0;
@@ -2641,18 +2667,20 @@ function rDash(){
         '<div style="background:var(--sur);padding:14px 18px">'+
           '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:5px">🔵 1ª Quinzena — dias 1 a 15</div>'+
           '<div style="font-size:26px;font-weight:700;color:var(--bl);font-variant-numeric:tabular-nums;margin-bottom:4px">'+fmt(tQ1)+'</div>'+
-          '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">'+(fq1.length+pp2.q1.length)+' item(s) · '+p1+'% do total</div>'+
+          '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">'+(fq1.length+vq1d.length+pp2.q1.length)+' item(s) · '+p1+'% do total</div>'+
           '<div style="display:flex;flex-direction:column;gap:3px">'+
-          [...fq1].sort((a,b)=>(a.venc||0)-(b.venc||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--blb);color:var(--bl);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>'+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
+          [...fq1].sort((a,b)=>(a.venc||0)-(b.venc||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--blb);color:var(--bl);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>📋 '+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
+          [...vq1d].sort((a,b)=>(vd2(a)||0)-(vd2(b)||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--gnb);color:var(--gn);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+(vd2(l)||'?')+'</span>🔄 '+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
           pp2.q1.sort((a,b)=>(a.dia||0)-(b.dia||0)).map(p=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+p.dia+'</span>💳 '+esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span></span><span style="font-weight:700;color:var(--rd)">'+fmt(p.vm)+'</span></div>').join('')+
           '</div></div>'+
         // Q2
         '<div style="background:var(--sur);padding:14px 18px">'+
           '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3);margin-bottom:5px">🟡 2ª Quinzena — dias 16 a 31</div>'+
           '<div style="font-size:26px;font-weight:700;color:var(--am);font-variant-numeric:tabular-nums;margin-bottom:4px">'+fmt(tQ2)+'</div>'+
-          '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">'+(fq2.length+pp2.q2.length)+' item(s) · '+p2+'% do total</div>'+
+          '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">'+(fq2.length+vq2d.length+pp2.q2.length)+' item(s) · '+p2+'% do total</div>'+
           '<div style="display:flex;flex-direction:column;gap:3px">'+
-          [...fq2].sort((a,b)=>(a.venc||0)-(b.venc||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>'+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
+          [...fq2].sort((a,b)=>(a.venc||0)-(b.venc||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+l.venc+'</span>📋 '+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
+          [...vq2d].sort((a,b)=>(vd2(a)||0)-(vd2(b)||0)).map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--gnb);color:var(--gn);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+(vd2(l)||'?')+'</span>🔄 '+esc(l.d||'')+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(l.v)+'</span></div>').join('')+
           pp2.q2.sort((a,b)=>(a.dia||0)-(b.dia||0)).map(p=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--bor)"><span><span style="background:var(--amb);color:var(--am);border-radius:3px;padding:1px 5px;font-size:10px;font-weight:700;margin-right:4px">dia '+p.dia+'</span>💳 '+esc(p.desc)+' <span style="font-size:10px;color:var(--tx3)">('+p.parcNo+'/'+p.total+')</span></span><span style="font-weight:700;color:var(--rd)">'+fmt(p.vm)+'</span></div>').join('')+
           '</div></div>'+
         // Sem vencimento (conditional)
