@@ -411,37 +411,52 @@ input:focus,select:focus{border-color:var(--tx);box-shadow:0 0 0 3px rgba(28,27,
     </div>
   </div>
 
-  <!-- GASTOS DO MÊS (unificado: fixos + variáveis) -->
+  <!-- GASTOS DO MÊS -->
   <div class="sec" id="s-lancamentos">
     <div class="ph">
-      <div><div class="pt">Gastos do mês</div><div class="ps" id="lanc-sub">Todos os gastos — fixos e variáveis — em um só lugar</div></div>
-      <button class="btn-p" onclick="addLancamento()">+ Adicionar gasto</button>
+      <div><div class="pt">Gastos do mês</div><div class="ps" id="lanc-sub">Fixos e variáveis</div></div>
     </div>
-    <!-- Filtros -->
-    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-      <select id="f-tipo-lanc" class="is" style="font-size:12px" onchange="rLancamentos()">
-        <option value="">Fixos + Variáveis</option>
-        <option value="fixo">Somente Fixos</option>
-        <option value="variavel">Somente Variáveis</option>
-      </select>
-      <select id="f-resp-lanc" class="is" style="font-size:12px" onchange="rLancamentos()"><option value="">Todos</option></select>
-      <select id="f-cat-lanc" class="is" style="font-size:12px" onchange="rLancamentos()"><option value="">Todas as categorias</option></select>
-    </div>
-    <div class="mg mg3" id="lanc-metrics"></div>
-    <div class="card">
-      <!-- Cabeçalho tabela -->
-      <div style="display:grid;grid-template-columns:1fr 90px 100px 90px 90px 120px 130px 28px;gap:6px;padding:7px 14px;background:var(--sur2);border-bottom:1px solid var(--bor);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3)">
-        <span>Descrição</span><span>Tipo</span><span>Categoria</span><span>Responsável</span><span style="text-align:right">Budget</span><span style="text-align:right">Realizado</span><span>Recorrência</span><span></span>
+    <div class="mg mg4" id="lanc-metrics"></div>
+
+    <!-- BLOCO: FIXOS -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="ch" style="background:var(--sur2)">
+        <span class="ct">📋 Gastos Fixos <span style="font-size:10px;font-weight:400;color:var(--tx3)">repetem todo mês</span></span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="cv neg" id="lanc-fix-tot">R$ 0,00</span>
+          <button class="btn-p" style="padding:5px 11px;font-size:12px" onclick="addLancTipo('fixo')">+ Fixo</button>
+        </div>
       </div>
-      <div id="lanc-list"></div>
-      <button class="btn-a" onclick="addLancamento()">+ Adicionar gasto</button>
+      <div style="display:grid;grid-template-columns:1fr 100px 90px 110px 90px 90px 28px;gap:6px;padding:6px 14px;background:var(--sur2);border-bottom:1px solid var(--bor);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3)">
+        <span>Descrição</span><span>Categoria</span><span>Resp.</span><span>Recorrência</span><span style="text-align:right">Gastos (R$)</span><span style="text-align:center">Ações</span><span></span>
+      </div>
+      <div id="lanc-fix-list"></div>
     </div>
+
+    <!-- BLOCO: VARIÁVEIS -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="ch" style="background:var(--sur2)">
+        <span class="ct">🔄 Gastos Variáveis <span style="font-size:10px;font-weight:400;color:var(--tx3)">lançamentos do mês</span></span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="cv neg" id="lanc-var-tot">R$ 0,00</span>
+          <button class="btn-p" style="padding:5px 11px;font-size:12px" onclick="addLancTipo('variavel')">+ Variável</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 100px 90px 110px 90px 28px;gap:6px;padding:6px 14px;background:var(--sur2);border-bottom:1px solid var(--bor);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--tx3)">
+        <span>Descrição</span><span>Categoria</span><span>Resp.</span><span>Data</span><span style="text-align:right">Gastos (R$)</span><span></span>
+      </div>
+      <div id="lanc-var-list"></div>
+    </div>
+
     <!-- Resumo por categoria -->
     <div class="g2" style="margin-top:14px">
       <div class="card"><div class="ch"><span class="ct">Por categoria</span></div><div id="lanc-cats"></div></div>
       <div class="card"><div class="ch"><span class="ct">Planejado vs Realizado</span><button class="btn-x" onclick="togglePlan()">✏️ Metas</button></div><div id="g-pvr"></div></div>
     </div>
     <div id="plan-card" style="display:none"><div class="card"><div class="ch"><span class="ct">Meta por categoria</span></div><div id="plan-list"></div></div></div>
+
+    <!-- stubs para compatibilidade -->
+    <div style="display:none"><div id="lanc-list"></div><div id="g-list"></div><div id="g-cats"></div><div id="g-metrics"></div><span id="g-tot"></span><div id="fixas-wrap"></div></div>
   </div>
 
     <!-- PARCELAMENTOS -->
@@ -683,6 +698,9 @@ const CATS_DEFAULT=[
   {id:'vestuario',emoji:'👗',nome:'Vestuário',cor:'#b45309',subs:[]},
   {id:'pet',emoji:'🐾',nome:'Pets / Beta',cor:'#9d174d',subs:['Ração','Veterinário','Banho']},
   {id:'assinatura',emoji:'📱',nome:'Assinaturas',cor:'#1e40af',subs:['Streaming']},
+  {id:'ac29',emoji:'🏠',nome:'AC29',cor:'#0e7490',subs:['Condomínio','IPTU','Manutenção','Outros']},
+  {id:'telefonia',emoji:'📞',nome:'Telefonia',cor:'#7c3aed',subs:['Celular Luiz','Celular Angela','Internet','Plano família']},
+  {id:'tecnologia',emoji:'💻',nome:'Tecnologia',cor:'#1d4ed8',subs:['Software','Hardware','Assinatura','Equipamento']},
   {id:'outro',emoji:'📦',nome:'Outros',cor:'#6b7280',subs:[]},
 ];
 const GRUPOS_FIXAS=[['moradia','🏠 Moradia'],['transporte','🚗 Transporte'],['contas','📋 Contas fixas'],['beta','🐾 Beta'],['outras','📦 Outras fixas']];
@@ -760,7 +778,19 @@ function gfix(){
 function gdiv(){const d=ld();if(!d.div)d.div=[];if(!d.amortizacoes)d.amortizacoes=[];return{d,div:d.div}}
 function gmet(){const d=ld();if(!d.met)d.met=[];return{d,met:d.met}}
 function gparc(){const d=ld();if(!d.parc)d.parc=[];if(!d.amortizacoes)d.amortizacoes=[];return{d,parc:d.parc}}
-function gcats(){const d=ld();if(!d.cats||!d.cats.length)d.cats=CATS_DEFAULT.map(c=>({...c}));return{d,cats:d.cats}}
+function gcats(){
+  const d=ld();
+  if(!d.cats||!d.cats.length){d.cats=CATS_DEFAULT.map(c=>({...c}));}
+  else{
+    // Merge: add any new default cats missing from storage
+    CATS_DEFAULT.forEach(def=>{
+      if(!d.cats.some(c=>c.id===def.id)){
+        d.cats.push({...def});
+      }
+    });
+  }
+  return{d,cats:d.cats};
+}
 function gApto(){const d=ld();if(!d.apto)d.apto={chaves_alvo:200000,chaves_guardado:0,orc_alvo:0,blocos:{}};if(!d.apto.blocos)d.apto.blocos={};if(!d.apto.chaves_alvo)d.apto.chaves_alvo=200000;if(!d.apto.orc_alvo)d.apto.orc_alvo=0;if(!d.amortizacoes)d.amortizacoes=[];return{d,apto:d.apto}}
 function sApto(apto,d){d.apto=apto;sv(d)}
 
@@ -779,8 +809,8 @@ function membCor(id){return(MEMBROS.find(m=>m.id===id)||{cor:'#166534'}).cor}
 function respPill(id){return'<span class="resp-pill '+membCls(id)+'">'+membLabel(id)+'</span>'}
 function totRec(m,a){const{m:mes}=gmes(m,a);return(mes.ls||0)+(mes.lc||0)+(mes.as||0)+(mes.ac||0)+sumv(mes.or||[],'valor')}
 function totFix(){
-  // Use stored lancamentos fixos for current month
-  const mes=gmes().m;const hoje=new Date();
+  propagaFixos(CM,CA);
+  const mes=gmes().m;
   const mesAtual=CA+'-'+String(CM+1).padStart(2,'0');
   return (mes.lanc||[]).filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual)).reduce((s,l)=>s+(l.v||0),0);
 }
@@ -977,130 +1007,287 @@ function buildPvR(){
   });
 }
 
-// ── GASTOS DO MÊS (unificado fixos + variáveis) ───────────────
+// ── GASTOS DO MÊS ─────────────────────────────────────────────
 function rLancamentos(){
   fillRespSelect('f-resp-lanc','',true);
   fillCatSelect('f-cat-lanc','',true);
-  // Se ainda não tem lancamentos fixos, popula do gfix() legado uma vez
+  // Migração de fixas legadas (gfix) para lanc[] uma vez por mês
   const{d,k,m}=gmes();
   if(!m.lanc.some(l=>l.tipo==='fixo')&&!m._fixMigrated){
     const{fx}=gfix();
     Object.values(fx).flat().forEach(it=>{
-      if(it.n&&it.v!==undefined)m.lanc.push({d:it.n||'',c:'outro',resp:it.resp||'familia',sub:'',tipo:'fixo',v:it.v||0,budget:it.budget||0,recorrencia:it.recorrencia||'recorrente',fim_mes:it.fim_mes||''});
+      if(it.n&&it.v!==undefined)
+        m.lanc.push({d:it.n||'',c:'outro',resp:it.resp||'familia',sub:'',tipo:'fixo',
+          v:it.v||0,recorrencia:it.recorrencia||'recorrente',fim_mes:it.fim_mes||'',data:''});
     });
     m._fixMigrated=true;
     smes(m,d,k);
   }
-  buildLancList();
+  buildLancFixList();
+  buildLancVarList();
   updateLancSummary();
 }
 
-function buildLancList(){
-  const{m:mes}=gmes();const list=document.getElementById('lanc-list');if(!list)return;
-  list.innerHTML='';
-  const lanc=mes.lanc||[];
-  const fTipo=document.getElementById('f-tipo-lanc')?.value||'';
-  const fResp=document.getElementById('f-resp-lanc')?.value||'';
-  const fCat=document.getElementById('f-cat-lanc')?.value||'';
+// Propaga fixos recorrentes para um mês que ainda não os tem
+function propagaFixos(targetM, targetA){
+  const{d,k:tk,m:tmes}=gmes(targetM,targetA);
+  // No guard — 'not exists' check below prevents duplicates
+  // Busca fixos de qualquer mês anterior
+  const store=ld();
+  let fixosBase=[];
+  for(let i=1;i<=12;i++){
+    let bm=targetM-i, ba=targetA;
+    if(bm<0){bm+=12;ba--;}
+    const bk=mk(bm,ba);
+    const bmes=(store.mes||{})[bk];
+    if(bmes&&(bmes.lanc||[]).some(l=>l.tipo==='fixo')){
+      fixosBase=(bmes.lanc||[]).filter(l=>l.tipo==='fixo');
+      break;
+    }
+  }
+  if(!fixosBase.length)return;
+  const mesAtual=targetA+'-'+String(targetM+1).padStart(2,'0');
+  // Copia apenas recorrentes que ainda não encerraram
+  fixosBase.forEach(f=>{
+    if(f.recorrencia==='data_fim'&&f.fim_mes&&f.fim_mes<mesAtual)return;
+    // Só adiciona se não existe ainda (mesmo nome+tipo)
+    if(!(tmes.lanc||[]).some(l=>l.tipo==='fixo'&&l.d===f.d)){
+      if(!tmes.lanc)tmes.lanc=[];
+      tmes.lanc.push({...f, v:0}); // copia estrutura, valor zerado p/ preenchimento
+    }
+  });
+  smes(tmes,d,tk);
+}
+
+// Replica fixo para N meses à frente
+function replicaFixo(lanc){
+  if(!lanc||!lanc.d){toast('Erro: item inválido.',1);return;}
+  const mesesAFrente=parseInt(prompt('Replicar "'+lanc.d+'" para quantos meses à frente?','6'))||0;
+  if(!mesesAFrente)return;
+  let replicados=0;
+  for(let i=1;i<=mesesAFrente;i++){
+    let m2=CM+i, a2=CA;
+    if(m2>11){m2-=12;a2++;}
+    const{d,k,m:mes}=gmes(m2,a2);
+    if(!mes.lanc)mes.lanc=[];
+    if(!mes.lanc.some(l=>l.tipo==='fixo'&&l.d===lanc.d)){
+      const item={...lanc, v:0};delete item._fixPropagado;mes.lanc.push(item);mes._fixPropagado=false;
+      smes(mes,d,k);
+      replicados++;
+    }
+  }
+  toast('"'+lanc.d+'" replicado para '+replicados+' meses ✓');
+}
+
+// Exclui fixo de todos os meses futuros
+function excluiFixoFuturos(lanc){
+  if(!lanc||!lanc.d){toast('Erro: item inválido.',1);return;}
+  if(!confirm('Excluir "'+lanc.d+'" de todos os meses futuros a partir de '+ML[CM]+'/'+CA+'?'))return;
+  const store=ld();
+  let removidos=0;
+  Object.keys(store.mes||{}).forEach(k=>{
+    const[ay,am]=k.split('-').map(Number);
+    // Meses futuros E atual
+    if(ay>CA||(ay===CA&&am-1>=CM)){
+      const mes=store.mes[k];
+      const antes=(mes.lanc||[]).length;
+      mes.lanc=(mes.lanc||[]).filter(l=>!(l.tipo==='fixo'&&l.d===lanc.d));
+      mes._fixPropagado=false; // reset so propagation can re-run
+      if(mes.lanc.length<antes)removidos++;
+    }
+  });
+  sv(store);
+  buildLancFixList();
+  updateLancSummary();
+  toast('"'+lanc.d+'" removido de '+removidos+' meses ✓');
+}
+
+function buildLancFixList(){
+  // Propaga fixos recorrentes automaticamente para o mês atual
+  propagaFixos(CM,CA);
+  const{m:mes}=gmes();
   const mesAtual=CA+'-'+String(CM+1).padStart(2,'0');
-  const filtered=lanc.filter(l=>
-    (!fTipo||l.tipo===fTipo)&&
-    (!fResp||l.resp===fResp)&&
-    (!fCat||l.c===fCat)
-  );
-  if(!filtered.length){const e=document.createElement('div');e.style.cssText='padding:16px;color:var(--tx3);font-size:13px';e.textContent='Nenhum gasto. Clique em "+ Adicionar gasto".';list.appendChild(e);return}
+  const list=document.getElementById('lanc-fix-list');
+  if(!list)return;
+  list.innerHTML='';
+  const fixos=(mes.lanc||[]).filter(l=>l.tipo==='fixo');
   const{cats}=gcats();
-  filtered.forEach(l=>{
-    const ri=lanc.indexOf(l);
-    const encerrado=l.tipo==='fixo'&&l.fim_mes&&l.fim_mes<mesAtual;
+
+  if(!fixos.length){
+    const e=document.createElement('div');e.style.cssText='padding:14px 16px;color:var(--tx3);font-size:13px';
+    e.textContent='Nenhum gasto fixo. Clique em "+ Fixo" para adicionar.';list.appendChild(e);return;
+  }
+
+  fixos.forEach(l=>{
+    const ri=(mes.lanc||[]).indexOf(l);
+    const encerrado=l.recorrencia==='data_fim'&&l.fim_mes&&l.fim_mes<mesAtual;
+
     const row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:1fr 90px 100px 90px 90px 120px 130px 28px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bor);align-items:center;'+(encerrado?'opacity:.5;background:var(--sur2)':'');
+    row.style.cssText='display:grid;grid-template-columns:1fr 100px 90px 110px 90px 90px 28px;gap:6px;'
+      +'padding:8px 14px;border-bottom:1px solid var(--bor);align-items:center;'
+      +(encerrado?'opacity:.45;background:var(--sur2)':'');
+
     // Descrição
-    const iD=el('input','it','text',l.d||'','Descrição do gasto');iD.style.fontSize='13px';
+    const iD=el('input','it','text',l.d||'','Nome do gasto fixo');iD.style.fontSize='13px';
     if(encerrado)iD.style.textDecoration='line-through';
-    // Tipo fixo/variável
-    const iTipo=document.createElement('select');iTipo.style.cssText='font-size:11px;padding:4px 5px;width:100%';
-    [['fixo','📋 Fixo'],['variavel','🔄 Variável']].forEach(([v,lb])=>{const o=document.createElement('option');o.value=v;o.textContent=lb;if(l.tipo===v)o.selected=true;iTipo.appendChild(o)});
+
     // Categoria
     const iC=document.createElement('select');iC.style.cssText='font-size:11px;padding:4px 5px;width:100%';
     cats.forEach(cat=>{const o=document.createElement('option');o.value=cat.id;o.textContent=cat.emoji+' '+cat.nome;if(l.c===cat.id)o.selected=true;iC.appendChild(o)});
+
     // Responsável
     const iR=document.createElement('select');iR.style.cssText='font-size:11px;padding:4px 3px;width:100%';
     MEMBROS.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.label;if(l.resp===m.id)o.selected=true;iR.appendChild(o)});
-    // Budget (âmbar)
-    const iBudg=el('input','','number',l.budget||'','Budget');iBudg.style.cssText='width:100%;text-align:right;font-size:12px;font-variant-numeric:tabular-nums;padding:4px;border:1px solid var(--ambd);background:var(--amb);border-radius:var(--r)';
-    // Realizado (verde)
-    const iV=el('input','','number',l.v||'','0,00');iV.style.cssText='width:100%;text-align:right;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;padding:4px;border:1px solid var(--gnbd);background:var(--gnb);border-radius:var(--r)';
-    // Recorrência (só para fixos)
+
+    // Recorrência
     const recCell=document.createElement('div');recCell.style.cssText='display:flex;flex-direction:column;gap:3px';
     const iRec=document.createElement('select');iRec.style.cssText='font-size:11px;padding:3px 5px;border:1px solid var(--bor);border-radius:var(--r);background:var(--sur)';
-    if(l.tipo==='fixo'){
-      [['recorrente','♾ Recorrente'],['data_fim','📅 Encerra em...']].forEach(([v,lb])=>{const o=document.createElement('option');o.value=v;o.textContent=lb;if((l.recorrencia||'recorrente')===v)o.selected=true;iRec.appendChild(o)});
-      const iFim=el('input','','month',l.fim_mes||'');iFim.style.cssText='font-size:11px;padding:2px 5px;border:1px solid var(--blbd);border-radius:var(--r);background:var(--blb);display:'+(l.recorrencia==='data_fim'?'block':'none');
-      iRec.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].recorrencia=iRec.value;if(iRec.value==='recorrente')m.lanc[ri].fim_mes='';smes(m,d,k);iFim.style.display=iRec.value==='data_fim'?'block':'none'});
-      iFim.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].fim_mes=iFim.value;smes(m,d,k);buildLancList()});
-      recCell.append(iRec,iFim);
-    } else {
-      const tag=document.createElement('span');tag.style.cssText='font-size:10px;color:var(--tx3)';tag.textContent='—';recCell.appendChild(tag);
-    }
-    const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancList();updateLancSummary()});
-    // Listeners — só salvam, não recriam DOM
+    [['recorrente','♾ Recorrente'],['data_fim','📅 Encerra em...']].forEach(([v,lb])=>{
+      const o=document.createElement('option');o.value=v;o.textContent=lb;if((l.recorrencia||'recorrente')===v)o.selected=true;iRec.appendChild(o);
+    });
+    const iFim=el('input','','month',l.fim_mes||'');
+    iFim.style.cssText='font-size:11px;padding:2px 5px;border:1px solid var(--blbd);border-radius:var(--r);background:var(--blb);display:'+(l.recorrencia==='data_fim'?'block':'none');
+    iRec.addEventListener('change',()=>{
+      const{d,k,m}=gmes();m.lanc[ri].recorrencia=iRec.value;
+      if(iRec.value==='recorrente')m.lanc[ri].fim_mes='';
+      smes(m,d,k);iFim.style.display=iRec.value==='data_fim'?'block':'none';
+    });
+    iFim.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].fim_mes=iFim.value;smes(m,d,k);buildLancFixList()});
+    recCell.append(iRec,iFim);
+
+    // Valor
+    const iV=el('input','','number',l.v||'','0,00');
+    iV.style.cssText='width:100%;text-align:right;font-size:13px;font-weight:700;padding:4px;'
+      +'border:1px solid var(--gnbd);background:var(--gnb);border-radius:var(--r);font-variant-numeric:tabular-nums';
+
+    // Ações: Replicar + Excluir futuros
+    const acoes=document.createElement('div');acoes.style.cssText='display:flex;gap:3px';
+    const btnRep=document.createElement('button');btnRep.className='btn-x';
+    btnRep.title='Replicar para meses futuros';btnRep.textContent='📋';
+    btnRep.style.cssText='padding:3px 6px;font-size:12px;border:1px solid var(--bor);border-radius:var(--r);cursor:pointer;background:var(--blb);color:var(--bl)';
+    btnRep.addEventListener('click',(e)=>{e.stopPropagation();replicaFixo({...l});});
+
+    const btnDel=document.createElement('button');btnDel.className='btn-x';
+    btnDel.title='Excluir dos meses futuros';btnDel.textContent='🗑';
+    btnDel.style.cssText='padding:3px 6px;font-size:12px;border:1px solid var(--bor);border-radius:var(--r);cursor:pointer;background:var(--rdb);color:var(--rd)';
+    btnDel.addEventListener('click',(e)=>{e.stopPropagation();excluiFixoFuturos({...l});});
+    acoes.append(btnRep,btnDel);
+
+    // Remover só deste mês
+    const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancFixList();updateLancSummary()});
+
     iD.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].d=iD.value;smes(m,d,k)});
-    iTipo.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].tipo=iTipo.value;smes(m,d,k);buildLancList();updateLancSummary()});
     iC.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].c=iC.value;smes(m,d,k);updateLancSummary()});
     iR.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].resp=iR.value;smes(m,d,k);updateLancSummary()});
-    iBudg.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].budget=parseFloat(iBudg.value)||0;smes(m,d,k)});
-    iV.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].v=parseFloat(iV.value)||0;smes(m,d,k);updateLancSummary()});
-    row.append(iD,iTipo,iC,iR,iBudg,iV,recCell,btn);
+    iV.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].v=parseFloat(iV.value)||0;smes(m,d,k);
+      setText('lanc-fix-tot',fmt((m.lanc||[]).filter(l=>l.tipo==='fixo').reduce((s,l)=>s+(l.v||0),0)));
+      updateLancSummary();
+    });
+
+    row.append(iD,iC,iR,recCell,iV,acoes,btn);
     list.appendChild(row);
-    // Badge encerrado
-    if(encerrado){const bdg=document.createElement('div');bdg.style.cssText='padding:2px 14px 6px;font-size:10px;color:var(--gn);border-bottom:1px solid var(--bor)';bdg.textContent='✅ Encerrado em '+l.fim_mes.replace('-','/');list.appendChild(bdg);}
-    else if(l.tipo==='fixo'&&l.recorrencia==='data_fim'&&l.fim_mes){
-      const hoje=new Date();const fim=new Date(l.fim_mes+'-01');
-      const mesesR=Math.round((fim-hoje)/(30*24*3600*1000));
-      if(mesesR<=3&&mesesR>=0){const bdg=document.createElement('div');bdg.style.cssText='padding:2px 14px 6px;font-size:10px;color:var(--am);border-bottom:1px solid var(--bor)';bdg.textContent='⚠️ Encerra em '+l.fim_mes.replace('-','/')+' ('+mesesR+'m)';list.appendChild(bdg);}
+
+    // Badge encerrado/aviso
+    if(encerrado){
+      const bdg=document.createElement('div');bdg.style.cssText='padding:2px 14px 5px;font-size:10px;color:var(--gn);border-bottom:1px solid var(--bor)';
+      bdg.textContent='✅ Encerrado em '+l.fim_mes.replace('-','/');list.appendChild(bdg);
+    } else if(l.recorrencia==='data_fim'&&l.fim_mes){
+      const mesesR=Math.round((new Date(l.fim_mes+'-01')-new Date())/(30*24*3600*1000));
+      if(mesesR<=3&&mesesR>=0){
+        const bdg=document.createElement('div');bdg.style.cssText='padding:2px 14px 5px;font-size:10px;color:var(--am);border-bottom:1px solid var(--bor)';
+        bdg.textContent='⚠️ Encerra em '+l.fim_mes.replace('-','/')+' ('+mesesR+'m)';list.appendChild(bdg);
+      }
     }
   });
+  // Botão adicionar
+  const addBtn=document.createElement('button');addBtn.className='btn-a';addBtn.textContent='+ Adicionar gasto fixo';
+  addBtn.addEventListener('click',()=>addLancTipo('fixo'));
+  list.appendChild(addBtn);
 }
 
-function addLancamento(){
+function buildLancVarList(){
+  const{m:mes}=gmes();
+  const list=document.getElementById('lanc-var-list');
+  if(!list)return;
+  list.innerHTML='';
+  const variaveis=(mes.lanc||[]).filter(l=>l.tipo==='variavel');
+  const{cats}=gcats();
+
+  if(!variaveis.length){
+    const e=document.createElement('div');e.style.cssText='padding:14px 16px;color:var(--tx3);font-size:13px';
+    e.textContent='Nenhum gasto variável. Clique em "+ Variável" para adicionar.';list.appendChild(e);
+  } else {
+    variaveis.forEach(l=>{
+      const ri=(mes.lanc||[]).indexOf(l);
+      const row=document.createElement('div');
+      row.style.cssText='display:grid;grid-template-columns:1fr 100px 90px 110px 90px 28px;gap:6px;padding:8px 14px;border-bottom:1px solid var(--bor);align-items:center';
+
+      const iD=el('input','it','text',l.d||'','Descrição');iD.style.fontSize='13px';
+      const iC=document.createElement('select');iC.style.cssText='font-size:11px;padding:4px 5px;width:100%';
+      cats.forEach(cat=>{const o=document.createElement('option');o.value=cat.id;o.textContent=cat.emoji+' '+cat.nome;if(l.c===cat.id)o.selected=true;iC.appendChild(o)});
+      const iR=document.createElement('select');iR.style.cssText='font-size:11px;padding:4px 3px;width:100%';
+      MEMBROS.forEach(m=>{const o=document.createElement('option');o.value=m.id;o.textContent=m.label;if(l.resp===m.id)o.selected=true;iR.appendChild(o)});
+      const iData=el('input','id','date',l.data||'');iData.style.cssText='font-size:11px;padding:3px 5px;width:100%';
+      const iV=el('input','','number',l.v||'','0,00');
+      iV.style.cssText='width:100%;text-align:right;font-size:13px;font-weight:700;padding:4px;border:1px solid var(--gnbd);background:var(--gnb);border-radius:var(--r);font-variant-numeric:tabular-nums';
+      const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancVarList();updateLancSummary()});
+
+      iD.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].d=iD.value;smes(m,d,k)});
+      iC.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].c=iC.value;smes(m,d,k);updateLancSummary()});
+      iR.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].resp=iR.value;smes(m,d,k);updateLancSummary()});
+      iData.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].data=iData.value;smes(m,d,k)});
+      iV.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].v=parseFloat(iV.value)||0;smes(m,d,k);
+        setText('lanc-var-tot',fmt((m.lanc||[]).filter(l=>l.tipo==='variavel').reduce((s,l)=>s+(l.v||0),0)));
+        updateLancSummary();
+      });
+      row.append(iD,iC,iR,iData,iV,btn);
+      list.appendChild(row);
+    });
+  }
+  const addBtn=document.createElement('button');addBtn.className='btn-a';addBtn.textContent='+ Adicionar gasto variável';
+  addBtn.addEventListener('click',()=>addLancTipo('variavel'));
+  list.appendChild(addBtn);
+}
+
+function addLancamento(){addLancTipo('variavel')}
+function addLancTipo(tipo){
   const{d,k,m}=gmes();if(!m.lanc)m.lanc=[];
-  m.lanc.push({d:'',c:'alimentacao',resp:'familia',sub:'',tipo:'variavel',v:0,budget:0,recorrencia:'recorrente',fim_mes:''});
-  smes(m,d,k);buildLancList();updateLancSummary();
+  m.lanc.push({d:'',c:'alimentacao',resp:'familia',sub:'',tipo,v:0,
+    recorrencia:tipo==='fixo'?'recorrente':undefined,fim_mes:'',data:''});
+  smes(m,d,k);
+  if(tipo==='fixo')buildLancFixList(); else buildLancVarList();
+  updateLancSummary();
 }
 
 function updateLancSummary(){
   const{m:mes}=gmes();const lanc=mes.lanc||[];
   const mesAtual=CA+'-'+String(CM+1).padStart(2,'0');
   const fixReal=lanc.filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual)).reduce((s,l)=>s+(l.v||0),0);
-  const fixBudg=lanc.filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual)).reduce((s,l)=>s+(l.budget||0),0);
   const varReal=lanc.filter(l=>l.tipo==='variavel').reduce((s,l)=>s+(l.v||0),0);
-  const varBudg=lanc.filter(l=>l.tipo==='variavel').reduce((s,l)=>s+(l.budget||0),0);
   const rec=totRec();const tot=fixReal+varReal;const saldo=rec-tot;
+  setText('lanc-fix-tot',fmt(fixReal));
+  setText('lanc-var-tot',fmt(varReal));
   const el2=document.getElementById('lanc-metrics');
   if(el2)el2.innerHTML=
-    '<div class="mc" style="cursor:default"><div class="ml">Fixos realizados</div><div class="mv neg">'+fmt(fixReal)+'</div><div class="ms">'+(fixBudg?'Budget: '+fmt(fixBudg):'sem budget')+'</div></div>'+
-    '<div class="mc" style="cursor:default"><div class="ml">Variáveis realizados</div><div class="mv neg">'+fmt(varReal)+'</div><div class="ms">'+(varBudg?'Budget: '+fmt(varBudg):'sem budget')+'</div></div>'+
-    '<div class="mc" style="cursor:default"><div class="ml">Total do mês</div><div class="mv neg">'+fmt(tot)+'</div></div>'+
+    '<div class="mc" style="cursor:default"><div class="ml">Fixos</div><div class="mv neg">'+fmt(fixReal)+'</div></div>'+
+    '<div class="mc" style="cursor:default"><div class="ml">Variáveis</div><div class="mv neg">'+fmt(varReal)+'</div></div>'+
+    '<div class="mc" style="cursor:default"><div class="ml">Total despesas</div><div class="mv neg">'+fmt(tot)+'</div></div>'+
     '<div class="mc" style="cursor:default"><div class="ml">Saldo</div><div class="mv '+(saldo>=0?'pos':'neg')+'">'+fmt(saldo)+'</div></div>';
-  // Also update summary panels
-  setText('lanc-sub','Gastos de '+MF[CM]+' — fixos e variáveis');
   buildLancCats();buildPvR();
 }
 
 function buildLancCats(){
-  const{m:mes}=gmes();const tots={};(mes.lanc||[]).forEach(l=>{tots[l.c]=(tots[l.c]||0)+(l.v||0)});
+  const{m:mes}=gmes();const tots={};(mes.lanc||[]).forEach(g=>{tots[g.c]=(tots[g.c]||0)+(g.v||0)});
   const el2=document.getElementById('lanc-cats');if(!el2)return;el2.innerHTML='';
   const ents=Object.entries(tots).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   if(!ents.length){el2.innerHTML='<div style="padding:14px 16px;color:var(--tx3);font-size:13px">Nenhum gasto.</div>';return}
   const mx=Math.max(...ents.map(([,v])=>v));
-  ents.forEach(([catId,v])=>{const cat=catById(catId);const div=document.createElement('div');div.style.cssText='padding:9px 16px;border-bottom:1px solid var(--bor);cursor:pointer';
+  ents.forEach(([catId,v])=>{const cat=catById(catId);const div=document.createElement('div');div.style.cssText='padding:9px 16px;border-bottom:1px solid var(--bor)';
     div.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span>'+cat.emoji+' '+cat.nome+'</span><span style="font-weight:700;color:var(--rd)">'+fmt(v)+'</span></div><div class="prog"><div class="progf" style="width:'+Math.round(v/mx*100)+'%;background:'+cat.cor+'"></div></div>';
     el2.appendChild(div);
   });
 }
 
-// Keep filterGastos working for dashboard drill-down (uses lanc[])
 function filterGastos({c,resp}){
   const{m:mes}=gmes();
   return(mes.lanc||[]).filter(l=>(!c||l.c===c)&&(!resp||l.resp===resp)).map(l=>({...l,v:l.v}));
