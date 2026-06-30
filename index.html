@@ -1253,8 +1253,10 @@ function propagaFixos(targetM, targetA){
   if(!fixosBase.length)return;
   const mesAtual=targetA+'-'+String(targetM).padStart(2,'0'); // mk() uses m directly, no +1
   // Copia apenas recorrentes que ainda não encerraram
+  const removidos=tmes._fixRemovidos||[];
   fixosBase.forEach(f=>{
     if(f.recorrencia==='data_fim'&&f.fim_mes&&f.fim_mes<mesAtual)return;
+    if(removidos.includes(f.d))return; // usuário excluiu explicitamente deste mês
     // Só adiciona se não existe ainda (mesmo nome+tipo)
     if(!(tmes.lanc||[]).some(l=>l.tipo==='fixo'&&l.d===f.d)){
       if(!tmes.lanc)tmes.lanc=[];
@@ -1297,7 +1299,8 @@ function excluiFixoFuturos(lanc){
       const mes=store.mes[k];
       const antes=(mes.lanc||[]).length;
       mes.lanc=(mes.lanc||[]).filter(l=>!(l.tipo==='fixo'&&l.d===lanc.d));
-      mes._fixPropagado=false; // reset so propagation can re-run
+      if(!mes._fixRemovidos)mes._fixRemovidos=[];
+      if(!mes._fixRemovidos.includes(lanc.d))mes._fixRemovidos.push(lanc.d);
       if(mes.lanc.length<antes)removidos++;
     }
   });
@@ -1403,7 +1406,14 @@ function buildLancFixList(){
     acoes.append(btnRep,btnDel);
 
     // Remover só deste mês
-    const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancFixList();updateLancSummary()});
+    const btn=mkX(()=>{
+      const{d,k,m}=gmes();
+      m.lanc.splice(ri,1);
+      if(!m._fixRemovidos)m._fixRemovidos=[];
+      if(!m._fixRemovidos.includes(l.d))m._fixRemovidos.push(l.d); // impede repropagação
+      smes(m,d,k);
+      buildLancFixList();updateLancSummary();
+    });
 
     iD.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].d=iD.value;smes(m,d,k)});
     iC.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].c=iC.value;smes(m,d,k);updateLancSummary()});
@@ -1511,7 +1521,7 @@ function addLancamento(){addLancTipo('variavel')}
 function addLancTipo(tipo){
   const{d,k,m}=gmes();if(!m.lanc)m.lanc=[];
   m.lanc.push({d:'',c:'alimentacao',resp:'familia',sub:'',tipo,v:0,
-    recorrencia:tipo==='fixo'?'recorrente':undefined,fim_mes:'',data:'',venc:null});
+    recorrencia:tipo==='fixo'?'recorrente':undefined,fim_mes:'',data:'',venc:null,pago:false});
   smes(m,d,k);
   if(tipo==='fixo')buildLancFixList(); else buildLancVarList();
   updateLancSummary();
