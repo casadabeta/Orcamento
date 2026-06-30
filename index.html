@@ -1273,17 +1273,22 @@ function replicaFixo(lanc){
   if(!mesesAFrente)return;
   let replicados=0;
   for(let i=1;i<=mesesAFrente;i++){
-    let m2=CM+i, a2=CA;
-    if(m2>11){m2-=12;a2++;}
+    // Cálculo robusto — funciona para qualquer quantidade de meses, mesmo cruzando vários anos
+    const totalMes=CM+i;
+    const m2=((totalMes%12)+12)%12;
+    const a2=CA+Math.floor(totalMes/12);
     const{d,k,m:mes}=gmes(m2,a2);
     if(!mes.lanc)mes.lanc=[];
+    // Remove da lista de "removidos" se estava lá, pois o usuário quer trazer de volta
+    if(mes._fixRemovidos)mes._fixRemovidos=mes._fixRemovidos.filter(nome=>nome!==lanc.d);
     if(!mes.lanc.some(l=>l.tipo==='fixo'&&l.d===lanc.d)){
-      const item={...lanc};delete item._fixPropagado;mes.lanc.push(item);mes._fixPropagado=false;
+      const item={...lanc};delete item._fixPropagado;mes.lanc.push(item);
       smes(mes,d,k);
       replicados++;
     }
   }
   toast('"'+lanc.d+'" replicado para '+replicados+' meses ✓');
+  buildLancFixList();updateLancSummary();buildFluxoCaixa();
 }
 
 // Exclui fixo de todos os meses futuros
@@ -1307,6 +1312,7 @@ function excluiFixoFuturos(lanc){
   sv(store);
   buildLancFixList();
   updateLancSummary();
+  buildFluxoCaixa();
   toast('"'+lanc.d+'" removido de '+removidos+' meses ✓');
 }
 
@@ -1412,7 +1418,7 @@ function buildLancFixList(){
       if(!m._fixRemovidos)m._fixRemovidos=[];
       if(!m._fixRemovidos.includes(l.d))m._fixRemovidos.push(l.d); // impede repropagação
       smes(m,d,k);
-      buildLancFixList();updateLancSummary();
+      buildLancFixList();updateLancSummary();buildFluxoCaixa();
     });
 
     iD.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].d=iD.value;smes(m,d,k)});
@@ -1498,7 +1504,7 @@ function buildLancVarList(){
       });
       const iV=el('input','','number',l.v||'','0,00');
       iV.style.cssText='width:100%;text-align:right;font-size:13px;font-weight:700;padding:4px;border:1px solid var(--gnbd);background:var(--gnb);border-radius:var(--r);font-variant-numeric:tabular-nums';
-      const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancVarList();updateLancSummary()});
+      const btn=mkX(()=>{const{d,k,m}=gmes();m.lanc.splice(ri,1);smes(m,d,k);buildLancVarList();updateLancSummary();buildFluxoCaixa();});
 
       iD.addEventListener('input',()=>{const{d,k,m}=gmes();m.lanc[ri].d=iD.value;smes(m,d,k)});
       iC.addEventListener('change',()=>{const{d,k,m}=gmes();m.lanc[ri].c=iC.value;smes(m,d,k);updateLancSummary()});
@@ -1529,7 +1535,7 @@ function addLancTipo(tipo){
 
 function updateLancSummary(){
   const{m:mes}=gmes();const lanc=mes.lanc||[];
-  const mesAtual=CA+'-'+String(CM+1).padStart(2,'0');
+  const mesAtual=CA+'-'+String(CM).padStart(2,'0'); // mk() usa CM diretamente, sem +1
   const fixReal=lanc.filter(l=>l.tipo==='fixo'&&(!l.fim_mes||l.fim_mes>=mesAtual)).reduce((s,l)=>s+(l.v||0),0);
   const varReal=lanc.filter(l=>l.tipo==='variavel').reduce((s,l)=>s+(l.v||0),0);
   const parcReal=parcMensal();
@@ -1544,7 +1550,7 @@ function updateLancSummary(){
     '<div class="mc" style="cursor:default"><div class="ml">Parcelas</div><div class="mv neg">'+fmt(parcReal)+'</div></div>'+
     '<div class="mc" style="cursor:default"><div class="ml">Total despesas</div><div class="mv neg">'+fmt(tot)+'</div></div>'+
     '<div class="mc" style="cursor:default"><div class="ml">Saldo</div><div class="mv '+(saldo>=0?'pos':'neg')+'">'+fmt(saldo)+'</div></div>';
-  buildLancCats();buildPvR();
+  buildLancCats();buildPvR();buildFluxoCaixa();
 }
 
 function buildLancCats(){
@@ -1808,7 +1814,7 @@ function buildParcelaList(){
     }
 
     // Remover
-    const btn=mkX(()=>{const{d,parc:pp}=gparc();pp.splice(i,1);d.parc=pp;sv(d);rParcelas()});
+    const btn=mkX(()=>{const{d,parc:pp}=gparc();pp.splice(i,1);d.parc=pp;sv(d);rParcelas();updateLancSummary();buildFluxoCaixa();});
 
     // ── Progress bar ─────────────────────────────────────────────────
     const pct=ativo&&nParc>0?Math.min(100,Math.round((parcNoMes-1)/nParc*100)):0;
