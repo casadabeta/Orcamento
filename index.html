@@ -2958,5 +2958,152 @@ window.addEventListener('DOMContentLoaded',async ()=>{
   rDash();
 });
 </script>
+  <script>
+/* ═══ MELHORIAS v2: backup, restauração, mobile e proteção de sincronização ═══ */
+(function(){
+if(window._patchV2)return;window._patchV2=1;
+
+/* 1) Carimbo de versão nos dados salvos (base da detecção de conflito) */
+var _svOrig=sv;
+sv=function(d){d._ts=Date.now();_svOrig(d);};
+window._lastCloudTs=null;
+
+/* 2) Backup: baixar todos os dados em um arquivo .json */
+window.exportBackup=function(){
+  try{
+    var raw=localStorage.getItem(SK)||'{}';
+    var blob=new Blob([raw],{type:'application/json'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='orcamento-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},2000);
+    toast('💾 Backup baixado! Guarde em local seguro.');
+  }catch(e){toast('Erro ao gerar backup: '+e.message,1);}
+};
+
+/* 3) Restauração: importar um backup .json */
+window.importBackup=function(ev){
+  var file=ev.target.files&&ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var data=JSON.parse(reader.result);
+      if(!data||typeof data!=='object'||(!data.mes&&!data.parc&&!data.div)){
+        toast('Arquivo inválido: não parece um backup do orçamento.',1);return;
+      }
+      var nM=Object.keys(data.mes||{}).length,nP=(data.parc||[]).length;
+      if(!confirm('Restaurar backup?\n\n• '+nM+' mês(es) de dados\n• '+nP+' parcelamento(s)\n\nATENÇÃO: os dados atuais deste aparelho serão substituídos.'))return;
+      localStorage.setItem(SK,JSON.stringify(data));
+      renderActive();
+      toast('📂 Backup restaurado ✓');
+      cloudPush();
+    }catch(e){toast('Erro ao ler backup: '+e.message,1);}
+  };
+  reader.readAsText(file);
+};
+
+/* 4) Botões 💾/📂 no painel Nuvem */
+if(!document.getElementById('backup-file')){
+  var refBtn=document.querySelector('button[onclick*="manualPull"]');
+  if(refBtn){
+    var linha=document.createElement('div');
+    linha.style.cssText='display:flex;gap:4px;margin-top:4px';
+    var b1=document.createElement('button');
+    b1.className='btn-s';b1.style.cssText='flex:1;font-size:10px;padding:4px 6px';
+    b1.textContent='💾 Backup';b1.title='Baixar cópia de segurança de todos os dados';
+    b1.onclick=window.exportBackup;
+    var b2=document.createElement('button');
+    b2.className='btn-s';b2.style.cssText='flex:1;font-size:10px;padding:4px 6px';
+    b2.textContent='📂 Restaurar';b2.title='Restaurar dados de um arquivo de backup';
+    b2.onclick=function(){document.getElementById('backup-file').click()};
+    linha.appendChild(b1);linha.appendChild(b2);
+    refBtn.parentElement.after(linha);
+    var inp=document.createElement('input');
+    inp.type='file';inp.id='backup-file';inp.accept='.json,application/json';
+    inp.style.display='none';
+    inp.addEventListener('change',window.importBackup);
+    document.body.appendChild(inp);
+  }
+}
+
+/* 5) Responsividade mobile */
+var st=document.createElement('style');
+st.textContent='@media(max-width:768px){'+
+  'body{flex-direction:column}'+
+  '.sb{position:static;width:100%;min-width:100%;height:auto;max-height:none;border-right:none;border-bottom:1px solid var(--bor);overflow:visible}'+
+  '.sb nav{display:flex;overflow-x:auto;gap:2px;padding:4px 8px;-webkit-overflow-scrolling:touch}'+
+  '.nav-grp{display:flex;align-items:center;flex-shrink:0;margin:0}'+
+  '.nav-lbl{display:none}'+
+  '.nav-it{white-space:nowrap;flex-shrink:0}'+
+  '.sb-brand{padding:10px 14px 6px}'+
+  '.mn{padding:14px 12px 80px}'+
+  '.mg{grid-template-columns:1fr 1fr!important}'+
+  '.sec>div[style*="grid-template-columns:340px"]{grid-template-columns:1fr!important}'+
+  '#d-kpis{grid-template-columns:1fr 1fr!important}'+
+  '#d-fluxo-dash>div[style*="grid-template-columns"],#lanc-fluxo>div[style*="grid-template-columns"]{grid-template-columns:1fr!important}'+
+  '.card{overflow-x:auto}'+
+  '#lanc-fix-list>div,#lanc-var-list>div,#parc-list>div{min-width:760px}'+
+  'div:has(+ #lanc-fix-list),div:has(+ #lanc-var-list),div:has(+ #parc-list){min-width:760px}'+
+  '#toast{left:12px;right:12px;bottom:12px;max-width:none;text-align:center}'+
+'}';
+document.head.appendChild(st);
+
+/* 6) Sincronização com detecção de conflito */
+var _pullOrig=cloudPull;
+cloudPull=async function(){
+  var r=await _pullOrig.apply(this,arguments);
+  try{var d=ld();if(d&&d._ts)window._lastCloudTs=d._ts;}catch(e){}
+  return r;
+};
+
+cloudPush=function(immediate){
+  if(!CLOUD_URL)return;
+  if(!immediate){
+    clearTimeout(_syncTimer);
+    _syncTimer=setTimeout(function(){cloudPush(true)},2000);
+    return;
+  }
+  _syncPending=true;
+  updSyncStatus('☁️ Salvando...','#1e3a8a');
+  var data=ld();
+  var doSend=function(){
+    fetch(CLOUD_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'dados='+encodeURIComponent(JSON.stringify(data)),
+      mode:'no-cors'
+    }).then(function(){
+      _syncPending=false;_lastSyncOk=new Date();
+      window._lastCloudTs=data._ts||null;
+      updSyncStatus('✅ Sincronizado às '+_lastSyncOk.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),'var(--gn)');
+    }).catch(function(err){
+      _syncPending=false;
+      updSyncStatus('⚠️ Erro ao enviar: '+err.message,'var(--rd)');
+    });
+  };
+  fetch(CLOUD_URL+'?t='+Date.now())
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(remote){
+      var remoteTs=remote&&remote._ts;
+      if(remoteTs&&window._lastCloudTs&&remoteTs>window._lastCloudTs&&remoteTs!==data._ts){
+        _syncPending=false;
+        var quando=new Date(remoteTs).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        if(confirm('⚠️ Há dados mais recentes na nuvem (salvos em '+quando+', provavelmente por outro aparelho).\n\nOK = CARREGAR os dados da nuvem (alterações não sincronizadas deste aparelho serão perdidas)\nCancelar = SOBRESCREVER a nuvem com os dados deste aparelho')){
+          localStorage.setItem(SK,JSON.stringify(remote));
+          window._lastCloudTs=remoteTs;
+          renderActive();
+          updSyncStatus('✅ Dados da nuvem carregados','var(--gn)');
+        }else{doSend();}
+      }else{doSend();}
+    })
+    .catch(function(){doSend()});
+};
+
+console.log('✨ Melhorias v2 ativadas: backup, mobile e proteção de conflito');
+})();
+</script>
 </body>
 </html>
